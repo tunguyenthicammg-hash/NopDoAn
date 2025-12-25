@@ -137,9 +137,9 @@ public function lichGac(Request $request)
     \Log::info('Found assignments:', ['count' => $phanCongList->count()]);
 
     // Map dữ liệu để trả về frontend
-    $data = $phanCongList->map(function ($pc) {
-        $lichThi = $pc->lichThi;
-        $phongThi = $pc->phongThi;
+        $data = $phanCongList->map(function ($pc) {
+            $lichThi = $pc->lichThi;
+            $phongThi = $pc->phongThi;
 
         // Đếm số lượng sinh viên đã điểm danh
         $attendedCount = \App\Models\LichThiSinhVien::where('lich_thi_id', $pc->exam_id)
@@ -149,24 +149,25 @@ public function lichGac(Request $request)
         $totalStudents = \App\Models\LichThiSinhVien::where('lich_thi_id', $pc->exam_id)
             ->count();
 
-        return [
-            'id' => $pc->id,
-            'exam_id' => $pc->exam_id,
-            'mon_hoc' => $lichThi->Mon_Hoc ?? '',
-            'ma_mon' => $lichThi->MaMT ?? '',
-            'ngay_thi' => $lichThi->Ngay_Thi ?? '',
-            'thu' => $lichThi->Ngay_Thi ? \Carbon\Carbon::parse($lichThi->Ngay_Thi)->locale('vi')->dayName : '',
-            'gio_bat_dau' => $lichThi->Gio_Bat_Dau ?? '',
-            'gio_ket_thuc' => $lichThi->Gio_Ket_Thuc ?? '',
-            'so_phong' => $phongThi->So_Phong ?? '',
-            'toa_nha' => $phongThi->Toa_Nha ?? '',
-            'role' => $pc->role,
-            'status' => $pc->status,
-            'confirmed_at' => $pc->confirmed_at ? $pc->confirmed_at->format('Y-m-d H:i:s') : null,
-            'ghi_chu' => $lichThi->Ghi_Chu ?? '',
-            'attended_count' => $attendedCount,
-            'total_students' => $totalStudents,
-        ];
+            return [
+                'id' => $pc->id,
+                'exam_id' => $pc->exam_id,
+                'mon_hoc' => $lichThi->Mon_Hoc ?? '',
+                'ma_mon' => $lichThi->MaMT ?? '',
+                'ngay_thi' => $lichThi->Ngay_Thi ?? '',
+                'thu' => $lichThi->Ngay_Thi ? \Carbon\Carbon::parse($lichThi->Ngay_Thi)->locale('vi')->dayName : '',
+                'gio_bat_dau' => $lichThi->Gio_Bat_Dau ?? '',
+                'gio_ket_thuc' => $lichThi->Gio_Ket_Thuc ?? '',
+                // Return numeric room id instead of room code string
+                'so_phong' => $pc->phong_thi_id ?? ($phongThi->id ?? null),
+                'toa_nha' => $phongThi->Toa_Nha ?? '',
+                'role' => $pc->role,
+                'status' => $pc->status,
+                'confirmed_at' => $pc->confirmed_at ? $pc->confirmed_at->format('Y-m-d H:i:s') : null,
+                'ghi_chu' => $lichThi->Ghi_Chu ?? '',
+                'attended_count' => $attendedCount,
+                'total_students' => $totalStudents,
+            ];
     });
 
     return response()->json([
@@ -317,7 +318,8 @@ public function updateLecturer(Request $request, $id) {
                         'ngay_thi' => $pc->lichThi->Ngay_Thi ?? '',
                         'gio_bat_dau' => $pc->lichThi->Gio_Bat_Dau ?? '',
                         'gio_ket_thuc' => $pc->lichThi->Gio_Ket_Thuc ?? '',
-                        'so_phong' => $pc->phongThi->So_Phong ?? '',
+                        // Return numeric room id instead of room code string
+                        'so_phong' => $pc->phong_thi_id ?? ($pc->phongThi->id ?? null),
                         'toa_nha' => $pc->phongThi->Toa_Nha ?? '',
                         'role' => $pc->role,
                         'status' => $pc->status,

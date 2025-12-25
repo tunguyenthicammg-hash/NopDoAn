@@ -1,6 +1,11 @@
 <template>
   <div class="admin-root">
         <header class="header" >
+      <button class="hamburger" @click="toggleMobileMenu" aria-label="Mở menu">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
       <h1 class="ppp">HỆ THỐNG HỖ TRỢ GIÁM THỊ ĐIỂM DANH SINH VIÊN BẰNG HÌNH ẢNH</h1>
        <div class="sidebar-logout">
   <button class="logout" @click="logout">
@@ -9,6 +14,17 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </div>
     </header>
+
+    <nav v-if="isMobileMenuOpen" class="mobile-menu">
+      <ul>
+        <li :class="{active: activePage==='home'}" @click="setActivePage('home')">Trang chủ</li>
+        <li :class="{active: activePage==='schedule'}" @click="setActivePage('schedule')">Lịch gác thi & Phòng gác thi</li>
+        <li :class="{active: activePage==='attendance'}" @click="setActivePage('attendance')">Kết quả điểm danh</li>
+        <li :class="{active: activePage==='lecturers'}" @click="setActivePage('lecturers')">Quản lí giảng viên</li>
+        <li :class="{active: activePage==='students'}" @click="setActivePage('students')">Quản lí sinh viên</li>
+        <li :class="{active: activePage==='password'}" @click="setActivePage('password')">Đổi mật khẩu</li>
+      </ul>
+    </nav>
 
     <div class="layout">
       <aside class="sidebar">
@@ -38,7 +54,7 @@
           <div v-if="activePage==='schedule'" class="page-body">
             <div class="toolbar">
               <div class="search">
-                <input v-model="scheduleSearch" placeholder="Tìm kiếm theo mã môn hoặc mã giảng viên" />
+                <input v-model="scheduleSearch" placeholder="Tìm kiếm theo tên môn học" />
               </div>
               <div class="actions">
                 <button @click="openScheduleForm()">Thêm</button>
@@ -58,31 +74,32 @@
                 <th class="border border-gray-300 px-2 py-1">Ghi chú</th>
                 <th class="border border-gray-300 px-2 py-1">Ngày tạo</th>
                 <th class="border border-gray-300 px-2 py-1">Cập nhật</th>
+                <th class="border border-gray-300 px-2 py-1">Chỉnh sửa</th>
               </tr>
             </thead>
             <tbody>
               <tr
-                v-for="(item, index) in schedules"
+                v-for="(item, index) in filteredSchedules"
                 :key="item.STT || item.id || index"
                 class="hover:bg-gray-50"
               >
-                <td class="border border-gray-300 px-2 py-1 text-center">{{ index + 1 }}</td>
-                <td class="border border-gray-300 px-2 py-1 text-center">{{ formatDate(item.Ngay_Thi) }}</td>
-                <td class="border border-gray-300 px-2 py-1 text-center">{{ item.Gio_Bat_Dau }}</td>
-                <td class="border border-gray-300 px-2 py-1">{{ item.Mon_Hoc }}</td>
-                <td class="border border-gray-300 px-2 py-1 text-center">{{ item.So_Phong }}</td>
-                <td class="border border-gray-300 px-2 py-1">
+                <td class="border border-gray-300 px-2 py-1 text-center" data-label="STT">{{ index + 1 }}</td>
+                <td class="border border-gray-300 px-2 py-1 text-center" data-label="Ngày thi">{{ formatDate(item.Ngay_Thi) }}</td>
+                <td class="border border-gray-300 px-2 py-1 text-center" data-label="Giờ bắt đầu">{{ item.Gio_Bat_Dau }}</td>
+                <td class="border border-gray-300 px-2 py-1" data-label="Môn học">{{ item.Mon_Hoc }}</td>
+                <td class="border border-gray-300 px-2 py-1 text-center" data-label="Số phòng">{{ item.So_Phong }}</td>
+                <td class="border border-gray-300 px-2 py-1" data-label="Danh sách sinh viên">
                   {{ Array.isArray(item.DSSV) ? item.DSSV.length : (item.DSSV ? item.DSSV.split(',').length : 0) }} sinh viên
                   <button @click="showStudentList(item.DSSV)" style="margin-left:8px; color:#0d6efd; background:none; border:none; cursor:pointer; text-decoration:underline;">Xem chi tiết</button>
                 </td>
-                <td class="border border-gray-300 px-2 py-1">
+                <td class="border border-gray-300 px-2 py-1" data-label="Danh sách giảng viên">
                   {{ Array.isArray(item.DSGV) ? item.DSGV.length : (item.DSGV ? item.DSGV.split(',').length : 0) }} giảng viên
                   <button @click="showLecturerList(item.DSGV)" style="margin-left:8px; color:#0d6efd; background:none; border:none; cursor:pointer; text-decoration:underline;">Xem chi tiết</button>
                 </td>
-                <td class="border border-gray-300 px-2 py-1">{{ item.Ghi_Chu }}</td>
-                <td class="border border-gray-300 px-2 py-1 text-center">{{ formatDate(item.created_at) }}</td>
-                <td class="border border-gray-300 px-2 py-1 text-center">{{ formatDate(item.updated_at) }}</td>
-                <td class="border border-gray-300 px-2 py-1 text-center">
+                <td class="border border-gray-300 px-2 py-1" data-label="Ghi chú">{{ item.Ghi_Chu }}</td>
+                <td class="border border-gray-300 px-2 py-1 text-center" data-label="Ngày tạo">{{ formatDate(item.created_at) }}</td>
+                <td class="border border-gray-300 px-2 py-1 text-center" data-label="Cập nhật">{{ formatDate(item.updated_at) }}</td>
+                <td class="border border-gray-300 px-2 py-1 text-center" data-label="Chỉnh sửa">
                   <button @click="openScheduleForm(item, index)" class="bg-blue-500 text-white px-2 py-1 rounded mr-1">Sửa</button>
                   <button @click="deleteSchedule(item.STT || item.id)" class="bg-red-500 text-white px-2 py-1 rounded">Xóa</button>
                 </td>
@@ -116,13 +133,13 @@
               </thead>
               <tbody>
                 <tr v-for="(a, i) in attendance" :key="a.id">
-                  <td>{{ a.mssv }}</td>
-                  <td>{{ a.name }}</td>
-                  <td>{{ a.subject }}</td>
-                  <td>{{ a.date }}</td>
-                  <td>{{ a.time }}</td>
-                  <td>{{ a.status }}</td>
-                  <td class="actions-cell"><button @click="deleteAttendance(i)">Xóa</button></td>
+                  <td data-label="MSSV">{{ a.mssv }}</td>
+                  <td data-label="Tên">{{ a.name }}</td>
+                  <td data-label="Môn">{{ a.subject }}</td>
+                  <td data-label="Ngày">{{ a.date }}</td>
+                  <td data-label="Thời gian">{{ a.time }}</td>
+                  <td data-label="Trạng thái">{{ a.status }}</td>
+                  <td class="actions-cell" data-label="Chỉnh sửa"><button @click="deleteAttendance(i)">Xóa</button></td>
                 </tr>
                 <tr v-if="attendance.length===0"><td colspan="7" class="empty">Không có dữ liệu</td></tr>
               </tbody>
@@ -131,8 +148,13 @@
 
           <!-- LECTURERS -->
           <div v-if="activePage==='lecturers'" class="page-body">
-            <div class="toolbar">
-              <button @click="openLecturerForm()">Thêm giảng viên</button>
+            <div class="toolbar toolbar-lecturers">
+              <div class="search">
+                <input v-model="lecturerSearch" placeholder="Tìm kiếm theo mã giảng viên" />
+              </div>
+              <div class="actions">
+                <button @click="openLecturerForm()">Thêm giảng viên</button>
+              </div>
             </div>
             <table class="table">
               <thead>
@@ -145,14 +167,14 @@
                 </tr>
               </thead>
                 <tbody>
-                      <tr v-for="(l, i) in lecturers" :key="l.MaGV">
-                        <td>{{ l.MaGV }}</td>
-                        <td>{{ l.Ho_va_Ten }}</td>
-                        <td>{{ l.Email }}</td>
-                        <td>{{ l.Sdt }}</td>
-                        <td class="actions-cell">
-                          <button @click="openLecturerForm(l, i)">Sửa</button>
-                          <button @click="deleteLecturer(l.MaGV)">Xóa</button>
+                      <tr v-for="(l, i) in filteredLecturers" :key="l.id">
+                        <td data-label="Mã giảng viên">{{ l.MaGV }}</td>
+                        <td data-label="Họ tên">{{ l.Ho_va_Ten }}</td>
+                        <td data-label="Email">{{ l.Email }}</td>
+                        <td data-label="SĐT">{{ l.Sdt }}</td>
+                        <td class="actions-cell" data-label="Chỉnh sửa">
+                          <button @click="openLecturerForm(l)" class="bg-blue-500 text-white px-2 py-1 rounded mr-1">Sửa</button>
+                          <button @click="deleteLecturer(l.id)" class="bg-red-500 text-white px-2 py-1 rounded">Xóa</button>
                         </td>
                       </tr>
                       <tr v-if="lecturers.length === 0">
@@ -164,13 +186,39 @@
 
           <!-- STUDENTS -->
           <div v-if="activePage==='students'" class="page-body">
-            <div class="toolbar">
-              <button @click="openStudentForm()">Thêm sinh viên</button>
-              <label class="excel-btn">
-                <input type="file" accept=".xlsx,.xls" @change="importStudentsFromExcel" style="display:none" />
-                Thêm sinh viên từ file Excel
-              </label>
-              <button @click="deleteAllStudents" class="delete-all-btn">Xóa tất cả sinh viên</button>
+            <!-- Desktop toolbar: search + buttons -->
+            <div class="toolbar desktop-only">
+              <div class="search">
+                <input v-model="studentSearch" placeholder="Tìm kiếm theo mã sinh viên" />
+              </div>
+              <div class="actions">
+                <button @click="openStudentForm()">Thêm sinh viên</button>
+                <label class="excel-btn">
+                  <input type="file" accept=".xlsx,.xls" @change="importStudentsFromExcel" style="display:none" />
+                  Thêm sinh viên từ file Excel
+                </label>
+                <button @click="deleteAllStudents" class="delete-all-btn">Xóa tất cả sinh viên</button>
+              </div>
+            </div>
+
+            <!-- Mobile toolbar: search + dropdown -->
+            <div class="toolbar toolbar-students mobile-only">
+              <div class="search">
+                <input v-model="studentSearch" placeholder="Tìm kiếm theo mã sinh viên" />
+              </div>
+              <div class="actions">
+                <div class="dropdown">
+                  <button @click="toggleStudentActions">Quản lý</button>
+                  <div v-if="studentActionsOpen" class="dropdown-menu">
+                    <button @click="openStudentForm()">Thêm sinh viên</button>
+                    <label class="excel-btn">
+                      <input type="file" accept=".xlsx,.xls" @change="importStudentsFromExcel" style="display:none" />
+                      Thêm sinh viên từ file Excel
+                    </label>
+                    <button @click="deleteAllStudents" class="delete-all-btn">Xóa tất cả sinh viên</button>
+                  </div>
+                </div>
+              </div>
             </div>
             <table class="table">
               <thead>
@@ -186,15 +234,15 @@
                 </tr>
               </thead>
               <tbody>
-                <tr v-for="(s, i) in students" :key="s.Mssv">
-                  <td>{{ i + 1 }}</td>
-                  <td>{{ s.Mssv }}</td>
-                  <td>{{ s.Ho_va_ten }}</td>
-                  <td>{{ formatDate(s.Ngay_Sinh) }}</td>
-                  <td>{{ s.Lop }}</td>
-                  <td>{{ s.Khoa }}</td>
-                  <td>{{ s.Bac || s.bac || s.BAC || 'Chưa có' }}</td>
-                  <td class="actions-cell">
+                <tr v-for="(s, i) in filteredStudents" :key="s.Mssv">
+                  <td data-label="STT">{{ i + 1 }}</td>
+                  <td data-label="Mã số sinh viên">{{ s.Mssv }}</td>
+                  <td data-label="Họ và tên">{{ s.Ho_va_ten }}</td>
+                  <td data-label="Ngày sinh">{{ formatDate(s.Ngay_Sinh) }}</td>
+                  <td data-label="Lớp">{{ s.Lop }}</td>
+                  <td data-label="Khoa">{{ s.Khoa }}</td>
+                  <td data-label="Bậc">{{ s.Bac || s.bac || s.BAC || 'Chưa có' }}</td>
+                  <td class="actions-cell" data-label="Chỉnh sửa">
                     <button @click="openStudentForm(s, i)">Sửa</button>
                     <button @click="deleteStudent(i)">Xóa</button>
                   </td>
@@ -299,7 +347,7 @@
         <textarea 
           v-model="scheduleForm.DSSV" 
           :placeholder="sinhVienInputMode === 'mssv' 
-            ? 'VD: 2021CNTT001, 2021CNTT002 hoặc mỗi MSSV 1 dòng' 
+            ? 'VD: DH52200000, DH52200001 hoặc mỗi MSSV 1 dòng' 
             : 'VD: Nguyễn Văn A, Trần Thị B hoặc mỗi tên 1 dòng'"
           rows="4"
         ></textarea>
@@ -370,7 +418,7 @@
 
      <!-- FORMS / MODALS cua giang vien -->
           <div v-if="showLecturerModal" class="modal">
-          <div class="modal-card">
+          <div class="modal-card modal-card-centered">
             <h3>{{ lecturerEditingIndex === null ? 'Thêm giảng viên' : 'Sửa giảng viên' }}</h3>
             <div class="form-row">
               <label>Mã giảng viên</label>
@@ -457,10 +505,10 @@
             </thead>
             <tbody>
               <tr v-for="sv in studentListDetail" :key="sv.Mssv">
-                <td>{{ sv.Mssv }}</td>
-                <td>{{ sv.Ho_va_ten }}</td>
-                <td>{{ formatDate(sv.Ngay_Sinh) }}</td>
-                <td>{{ sv.Lop }}</td>
+                <td data-label="MSSV">{{ sv.Mssv }}</td>
+                <td data-label="Họ và tên">{{ sv.Ho_va_ten }}</td>
+                <td data-label="Ngày sinh">{{ formatDate(sv.Ngay_Sinh) }}</td>
+                <td data-label="Lớp">{{ sv.Lop }}</td>
               </tr>
               <tr v-if="studentListDetail.length === 0">
                 <td colspan="4" class="empty">Không có dữ liệu</td>
@@ -488,8 +536,8 @@
             </thead>
             <tbody>
               <tr v-for="gv in lecturerListDetail" :key="gv.MaGV">
-                <td>{{ gv.MaGV }}</td>
-                <td>{{ gv.Ho_va_Ten }}</td>
+                <td data-label="Mã giảng viên">{{ gv.MaGV }}</td>
+                <td data-label="Họ và tên">{{ gv.Ho_va_Ten }}</td>
               </tr>
               <tr v-if="lecturerListDetail.length === 0">
                 <td colspan="2" class="empty">Không có dữ liệu</td>
@@ -552,27 +600,27 @@
             </thead>
             <tbody>
               <tr>
-                <td>Lập trình Web</td>
-                <td>2025-12-25</td>
-                <td>08:00</td>
-                <td>10:00</td>
-                <td>1</td>
-                <td style="white-space: pre-line; max-width: 150px;">2021CNTT001
+                <td data-label="Môn học">Lập trình Web</td>
+                <td data-label="Ngày thi">2025-12-25</td>
+                <td data-label="Giờ bắt đầu">08:00</td>
+                <td data-label="Giờ kết thúc">10:00</td>
+                <td data-label="Số phòng">1</td>
+                <td data-label="Danh sách SV" style="white-space: pre-line; max-width: 150px;">2021CNTT001
 2021CNTT002
 2021CNTT003</td>
-                <td style="white-space: pre-line;">GV001
+                <td data-label="Danh sách GV" style="white-space: pre-line;">GV001
 GV002</td>
-                <td>Ca sáng</td>
+                <td data-label="Ghi chú">Ca sáng</td>
               </tr>
               <tr>
-                <td>Cơ sở dữ liệu</td>
-                <td>2025-12-26</td>
-                <td>13:00</td>
-                <td>15:00</td>
-                <td>2</td>
-                <td>Nguyễn Văn A, Trần Thị B</td>
-                <td>Hoa Triệu, Nhậm Tuấn</td>
-                <td>Ca chiều</td>
+                <td data-label="Môn học">Cơ sở dữ liệu</td>
+                <td data-label="Ngày thi">2025-12-26</td>
+                <td data-label="Giờ bắt đầu">13:00</td>
+                <td data-label="Giờ kết thúc">15:00</td>
+                <td data-label="Số phòng">2</td>
+                <td data-label="Danh sách SV">Nguyễn Văn A, Trần Thị B</td>
+                <td data-label="Danh sách GV">Hoa Triệu, Nhậm Tuấn</td>
+                <td data-label="Ghi chú">Ca chiều</td>
               </tr>
             </tbody>
           </table>
@@ -652,6 +700,21 @@ GV002</td>
       </div>
     </div>
 
+    <!-- Toast Notification (Mobile) -->
+    <div v-if="notify.show" class="toast" :class="`toast-${notify.type}`">
+      {{ notify.message }}
+    </div>
+
+    <!-- Confirm Modal (Mobile) -->
+    <div v-if="confirmDialog.show" class="modal" style="position: fixed; display: flex;">
+      <div class="modal-card" style="max-width: 400px;">
+        <p style="margin-top: 0; margin-bottom: 20px; font-size: 16px; line-height: 1.5;">{{ confirmDialog.message }}</p>
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+          <button @click="confirmDialog.show = false; confirmDialog.resolve(false)" style="background: #6c757d; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600;">Hủy</button>
+          <button @click="confirmDialog.show = false; confirmDialog.resolve(true)" style="background: #0d6efd; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-weight: 600;">Xác nhận</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -667,6 +730,54 @@ axios.defaults.withCredentials = true
 axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest'
 
 const activePage = ref('home')
+const isMobileMenuOpen = ref(false)
+
+// Toast notification state
+const notify = reactive({
+  show: false,
+  message: '',
+  type: 'success' // 'success', 'error', 'info'
+})
+
+// Confirm dialog state
+const confirmDialog = reactive({
+  show: false,
+  message: '',
+  resolve: null
+})
+
+// Show notification: alert on desktop, toast on mobile
+function showNotify(message, type = 'success') {
+  if (window.innerWidth > 900) {
+    // Desktop: use native alert
+    alert(message)
+  } else {
+    // Mobile: show toast
+    notify.message = message
+    notify.type = type
+    notify.show = true
+    
+    // Auto-hide after 2.5 seconds
+    setTimeout(() => {
+      notify.show = false
+    }, 2500)
+  }
+}
+
+// Confirm dialog: confirm on desktop, modal on mobile
+function showConfirm(message) {
+  return new Promise((resolve) => {
+    if (window.innerWidth > 900) {
+      // Desktop: use native confirm
+      resolve(confirm(message))
+    } else {
+      // Mobile: show custom modal
+      confirmDialog.message = message
+      confirmDialog.show = true
+      confirmDialog.resolve = resolve
+    }
+  })
+}
 
 // Password change form
 const passwordForm = reactive({
@@ -704,7 +815,7 @@ async function changePassword() {
     } else if (error.response?.data?.message) {
       passwordErrors.value = { current_password: error.response.data.message }
     } else {
-      alert('Có lỗi xảy ra khi đổi mật khẩu!')
+      showNotify('Có lỗi xảy ra khi đổi mật khẩu!', 'error')
     }
   } finally {
     changingPassword.value = false
@@ -712,39 +823,50 @@ async function changePassword() {
 }
 
 async function deleteAllStudents() {
-  if(!confirm('⚠️ CẢNH BÁO: Bạn có chắc chắn muốn xóa TẤT CẢ sinh viên? Hành động này không thể hoàn tác!')) return
+  if(!(await showConfirm('⚠️ CẢNH BÁO: Bạn có chắc chắn muốn xóa TẤT CẢ sinh viên? Hành động này không thể hoàn tác!'))) return
   try {
     const response = await axios.post('/students/delete-all')
-    if (response.data.success) {
-      // Tạo một mảng mới để trigger reactivity
-      const newStudents = []
-      students.value = newStudents
 
-      // Xóa cache trong localStorage
+    // Backend currently returns { message: '...' } with 200 on success.
+    // Treat any 2xx status as success for compatibility.
+    if (response && response.status >= 200 && response.status < 300) {
+      // Clear local UI data and localStorage
+      students.value = []
       localStorage.removeItem('students')
-      
-      // Force re-render bằng cách tạo một nextTick
-      await nextTick()
-      
-      // Double check với server
-      const checkResponse = await axios.get('/students')
-      if (Array.isArray(checkResponse.data)) {
-        students.value = [...checkResponse.data]
+
+      // Refresh from server to ensure consistent state
+      try {
+        const checkResponse = await axios.get('/students')
+        if (Array.isArray(checkResponse.data)) {
+          students.value = [...checkResponse.data]
+        }
+      } catch (e) {
+        // If refresh fails, keep students as empty but log the error
+        console.warn('Could not refresh students after delete-all', e)
       }
-      
-      alert('✅ Đã xóa tất cả sinh viên!')
+
+      // Notify user and (optionally) reload page
+      showNotify('✅ Đã xóa tất cả sinh viên!', 'success')
+      // If you prefer a full page reload uncomment next line:
+      // window.location.reload()
     } else {
-      throw new Error(response.data.message || 'Không thể xóa sinh viên')
+      throw new Error(response.data?.message || 'Không thể xóa sinh viên')
     }
   } catch(err) {
     console.error('❌ Lỗi khi xóa tất cả sinh viên:', err.response?.data || err.message)
-    alert('❌ Không thể xóa tất cả sinh viên: ' + (err.response?.data?.message || err.message))
+    const serverMsg = err.response?.data?.message || err.message || 'Lỗi không xác định'
+    showNotify('❌ Không thể xóa tất cả sinh viên: ' + serverMsg, 'error')
   }
 }
 
 function setActivePage(p){
   console.log('nav click ->', p)
   activePage.value = p
+  isMobileMenuOpen.value = false
+}
+
+function toggleMobileMenu(){
+  isMobileMenuOpen.value = !isMobileMenuOpen.value
 }
 
 const pageTitle = computed(() => {
@@ -790,7 +912,14 @@ function formatDate(dateString) {
 const fetchLecturers = async () => {
   try {
     const res = await axios.get('/lecturers')
-    lecturers.value = res.data || []
+    let data = res.data || []
+    // Sắp xếp theo MaGV tăng dần
+    data.sort((a, b) => {
+      const maGVA = String(a.MaGV || '').toUpperCase()
+      const maGVB = String(b.MaGV || '').toUpperCase()
+      return maGVA.localeCompare(maGVB, 'vi')
+    })
+    lecturers.value = data
   } catch (err) {
     console.error('fetchLecturers failed', err.response?.status, err.response?.data || err.message)
   }
@@ -925,19 +1054,19 @@ async function saveSchedule() {
     if (scheduleEditingIndex.value === null) {
       // Thêm mới
       await axios.post('/schedules/add', scheduleData);
-      alert('✅ Thêm lịch thi thành công!');
+      showNotify('✅ Thêm lịch thi thành công!', 'success');
     } else {
       // Cập nhật: dùng STT (hoặc id) làm identifier
       const id = scheduleForm.STT || scheduleForm.id || scheduleEditingIndex.value;
       await axios.put(`/schedules/update/${id}`, scheduleData);
-      alert('✅ Cập nhật lịch thi thành công!');
+      showNotify('✅ Cập nhật lịch thi thành công!', 'success');
     }
 
     await fetchSchedules();
     closeScheduleForm();
   } catch (err) {
     console.error('❌ Lỗi khi lưu lịch thi:', err.response?.data || err.message);
-    alert('❌ Không thể lưu lịch thi');
+    showNotify('❌ Không thể lưu lịch thi', 'error');
   } finally {
     isSavingSchedule.value = false // Re-enable button
   }
@@ -963,59 +1092,100 @@ onMounted(() => {
 
 // Tìm kiếm
 const scheduleSearch = ref('')
+const normalizeStr = (v='') => v.toString().toLowerCase().normalize('NFD').replace(/\p{Diacritic}/gu,'')
 const filteredSchedules = computed(() => {
   if (!scheduleSearch.value) return schedules.value
-  const q = scheduleSearch.value.toLowerCase()
-  return schedules.value.filter(r => r.subjectCode.toLowerCase().includes(q) || r.lecturerCode.toLowerCase().includes(q))
+  const q = normalizeStr(scheduleSearch.value)
+  return schedules.value.filter(r => {
+    const name = normalizeStr(r.Mon_Hoc || r.subjectName || '')
+    const code = normalizeStr(r.Ma_Mon || r.subjectCode || '')
+    return name.includes(q) || code.includes(q)
+  })
 })
+
+// Tìm kiếm giảng viên theo mã
+const lecturerSearch = ref('')
+const filteredLecturers = computed(() => {
+  if (!lecturerSearch.value) return lecturers.value
+  const q = normalizeStr(lecturerSearch.value)
+  return lecturers.value.filter(l => normalizeStr(l.MaGV || '').includes(q))
+})
+
+// Tìm kiếm sinh viên theo MSSV
+const studentSearch = ref('')
+const filteredStudents = computed(() => {
+  if (!studentSearch.value) return students.value
+  const q = normalizeStr(studentSearch.value)
+  return students.value.filter(s => normalizeStr(s.Mssv || '').includes(q))
+})
+
+// Toggle dropdown quản lý sinh viên
+const studentActionsOpen = ref(false)
+function toggleStudentActions(){
+  studentActionsOpen.value = !studentActionsOpen.value
+}
 
 // =============================
 // MODALS & FORM - Giảng viên
 // =============================
 const showLecturerModal = ref(false)
-const lecturerForm = reactive({ MaGV: '', Ho_va_Ten: '', Email: '', Sdt: '' })
+const lecturerForm = reactive({ id: null, MaGV: '', Ho_va_Ten: '', Email: '', Sdt: '' })
 const lecturerEditingIndex = ref(null)
 
-function openLecturerForm(item=null, idx=null){
+function openLecturerForm(item=null){
   if(item){ 
     Object.assign(lecturerForm, item); 
-    lecturerEditingIndex.value = idx }
-  else { 
+    lecturerEditingIndex.value = item.id;
+  } else { 
     Object.assign(lecturerForm, {
+      id: null,
       MaGV:'',
       Ho_va_Ten:'',
       Email:'',
       Sdt:''});
-       lecturerEditingIndex.value = null;
-      }
+    lecturerEditingIndex.value = null;
+  }
   showLecturerModal.value = true;
 }
-function closeLecturerForm(){ showLecturerModal.value = false }
+function closeLecturerForm(){ 
+  showLecturerModal.value = false;
+  Object.assign(lecturerForm, {
+    id: null,
+    MaGV:'',
+    Ho_va_Ten:'',
+    Email:'',
+    Sdt:''});
+  lecturerEditingIndex.value = null;
+}
 async function saveLecturer() {
   try {
-  if (lecturerEditingIndex.value === null) {
+    if (!lecturerForm.MaGV || !lecturerForm.Ho_va_Ten) {
+      showNotify('❌ Vui lòng điền đầy đủ thông tin (Mã giảng viên, Họ tên)', 'error');
+      return;
+    }
+    if (lecturerEditingIndex.value === null) {
       // ➕ Thêm mới
       await axios.post('/lecturers/add', lecturerForm);
-      alert('✅ Thêm giảng viên thành công!');
+      showNotify('✅ Thêm giảng viên thành công!', 'success');
     } else {
-      // ✏️ Cập nhật
-      await axios.put(`/lecturers/update/${lecturerForm.MaGV}`, lecturerForm);
-      alert('✅ Cập nhật giảng viên thành công!');
+      // ✏️ Cập nhật - dùng ID thay vì MaGV
+      await axios.put(`/lecturers/update/${lecturerEditingIndex.value}`, lecturerForm);
+      showNotify('✅ Cập nhật giảng viên thành công!', 'success');
     }
 
     await fetchLecturers();
     closeLecturerForm();
   } catch (err) {
     console.error('❌ Lỗi khi lưu giảng viên:', err.response?.data || err.message);
-    alert('❌ Không thể lưu giảng viên.');
+    showNotify('❌ Không thể lưu giảng viên: ' + (err.response?.data?.message || err.message), 'error');
   }
 }
 async function deleteLecturer(id){
-  if (!confirm('Bạn có chắc chắn muốn xóa giảng viên này không?')) return;
+  if (!(await showConfirm('Bạn có chắc chắn muốn xóa giảng viên này không?'))) return;
   try {
     await axios.delete(`/lecturers/delete/${id}`);
-    await fetchLecturers(); // ✅ gọi hàm thật sự
-    alert('✅ Xóa giảng viên thành công!');
+    await fetchLecturers();
+    showNotify('✅ Xóa giảng viên thành công!', 'success');
   } catch (err) {
     console.error('❌ Lỗi khi xóa giảng viên:', err.response?.data || err.message);
   }}
@@ -1076,15 +1246,15 @@ async function saveStudent(){
   try {
     // Validate các trường bắt buộc
     if (!studentForm.Mssv) {
-      alert('❌ Vui lòng nhập MSSV');
+      showNotify('❌ Vui lòng nhập MSSV', 'error');
       return;
     }
     if (!studentForm.Ho_va_ten) {
-      alert('❌ Vui lòng nhập Họ và tên');
+      showNotify('❌ Vui lòng nhập Họ và tên', 'error');
       return;
     }
     if (!studentForm.Bac) {
-      alert('❌ Vui lòng nhập Bậc đào tạo');
+      showNotify('❌ Vui lòng nhập Bậc đào tạo', 'error');
       return;
     }
 
@@ -1170,26 +1340,26 @@ async function saveStudent(){
     }
   } catch (err) {
     console.error('Lỗi khi lưu sinh viên:', err);
-    alert('❌ Không thể lưu sinh viên: ' + (err.response?.data?.message || err.message));
+    showNotify('❌ Không thể lưu sinh viên: ' + (err.response?.data?.message || err.message), 'error');
   }
 }
 async function deleteStudent(i){
   const s = students.value[i]
-  if(!s){ alert('Không tìm thấy sinh viên để xóa'); return }
-  if(!confirm('Bạn có chắc chắn muốn xóa sinh viên này?')) return;
+  if(!s){ showNotify('Không tìm thấy sinh viên để xóa', 'error'); return }
+  if(!(await showConfirm('Bạn có chắc chắn muốn xóa sinh viên này?'))) return;
   try{
     // dùng route mới: DELETE /students/delete/{id}
     const id = s.id || s.Mssv || s.mssv
     await axios.delete(`/students/delete/${encodeURIComponent(id)}`)
     await fetchStudents()
-    alert('✅ Xóa sinh viên thành công!')
+    showNotify('✅ Xóa sinh viên thành công!', 'success')
   }catch(err){
     console.error('❌ Lỗi khi xóa sinh viên:', err.response?.data || err.message)
     // Hiển thị chi tiết lỗi từ server nếu có
     const serverData = err.response?.data
     let msg = serverData?.message || err.message || 'Xóa thất bại'
     if (serverData?.error) msg += ': ' + serverData.error
-    alert('❌ Xóa sinh viên thất bại: ' + msg)
+    showNotify('❌ Xóa sinh viên thất bại: ' + msg, 'error')
   }
 }
 
@@ -1261,17 +1431,17 @@ function closeScheduleForm(){ showScheduleModal.value = false }
 
 async function deleteSchedule(id) {
   if (!id) {
-    alert('Không xác định id lịch thi để xóa.');
+    showNotify('Không xác định id lịch thi để xóa.', 'error');
     return;
   }
-  if (!confirm('Bạn có chắc chắn muốn xóa lịch thi này không?')) return;
+  if (!(await showConfirm('Bạn có chắc chắn muốn xóa lịch thi này không?'))) return;
   try {
     await axios.delete(`/schedules/delete/${encodeURIComponent(id)}`);
     await fetchSchedules();
-    alert('✅ Xóa lịch thi thành công!');
+    showNotify('✅ Xóa lịch thi thành công!', 'success');
   } catch (err) {
     console.error('❌ Lỗi khi xóa lịch thi:', err.response?.data || err.message);
-    alert('❌ Xóa thất bại: ' + (err.response?.data?.message || err.message));
+    showNotify('❌ Xóa thất bại: ' + (err.response?.data?.message || err.message), 'error');
   }
 }
 
@@ -1375,7 +1545,9 @@ const attendanceForm = reactive({ mssv:'', name:'', subject:'', date:'', time:''
 function openAttendanceForm(){ Object.assign(attendanceForm, { mssv:'', name:'', subject:'', date:'', time:'', status:'Có mặt' }); showAttendanceModal.value = true }
 function closeAttendanceForm(){ showAttendanceModal.value = false }
 function saveAttendance(){ attendance.value.push({ id: Date.now(), ...attendanceForm }); closeAttendanceForm() }
-function deleteAttendance(i){ if(confirm('Xóa điểm danh này?')) attendance.value.splice(i,1) }
+async function deleteAttendance(i){ 
+  if(await showConfirm('Xóa điểm danh này?')) attendance.value.splice(i,1) 
+}
 
 // =============================
 // KẾT QUẢ & XUẤT FILE
@@ -1435,7 +1607,16 @@ if (!localStorage.getItem('dataReset2025')) {
 // Khởi tạo dữ liệu từ localStorage (nếu có)
 const init = ()=>{
   try{
-    const ls = JSON.parse(localStorage.getItem('lecturers')||'null'); if(ls) lecturers.value = ls
+    const ls = JSON.parse(localStorage.getItem('lecturers')||'null')
+    if(ls) {
+      // Sắp xếp theo MaGV tăng dần
+      ls.sort((a, b) => {
+        const maGVA = String(a.MaGV || '').toUpperCase()
+        const maGVB = String(b.MaGV || '').toUpperCase()
+        return maGVA.localeCompare(maGVB, 'vi')
+      })
+      lecturers.value = ls
+    }
     const ss = JSON.parse(localStorage.getItem('students')||'null'); if(ss) students.value = ss
     const sc = JSON.parse(localStorage.getItem('schedules')||'null'); if(sc) schedules.value = sc
     const at = JSON.parse(localStorage.getItem('attendance')||'null'); if(at) attendance.value = at
@@ -1624,6 +1805,40 @@ function importStudentsFromExcel(e) {
   margin-left: 0px; 
   font-size: 22px;
 }
+.hamburger{
+  display:none;
+  width:36px;
+  height:32px;
+  align-items:center;
+  justify-content:center;
+  flex-direction:column;
+  gap:5px;
+  background:transparent;
+  border:none;
+  cursor:pointer;
+  margin-right:12px;
+  padding:4px;
+}
+.hamburger span{
+  display:block;
+  width:22px;
+  height:2px;
+  background:#ffffff;
+  border-radius:2px;
+}
+.mobile-menu{
+  display:none;
+  background:#ffffff;
+  box-shadow:0 8px 20px rgba(0,0,0,0.08);
+  border-radius:0 0 12px 12px;
+  padding:10px 14px;
+  position:sticky;
+  top:0;
+  z-index:15;
+}
+.mobile-menu ul{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px}
+.mobile-menu li{padding:12px 10px;border-radius:10px;border:1px solid #e5e9ee;color:#234;cursor:pointer}
+.mobile-menu li.active{background:#e9f3ff;border-color:#b8d6f7;color:#0b4f85;font-weight:700}
 .ppp{
   color:#ffffff;
   font-size: 38px;
@@ -1636,6 +1851,8 @@ function importStudentsFromExcel(e) {
 .topbar{height:76px;background:linear-gradient(90deg,var(--blue1),var(--blue2));color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 24px}
 .topbar .brand{font-size:22px;font-weight:700;letter-spacing:1px}
 .layout{display:flex}
+.mobile-only{display:none !important}
+.desktop-only{display:flex}
 .sidebar{width:300px;background:#e6eaec;padding-top:20px;min-height:calc(100vh - 76px)}
 .sidebar nav ul{list-style:none;padding:0;margin:0}
 .sidebar nav li{padding:18px 20px;color:#234;cursor:pointer;border-left:6px solid transparent}
@@ -1644,9 +1861,42 @@ function importStudentsFromExcel(e) {
 .card{background:#fff;border-radius:12px;padding:28px;box-shadow:0 8px 20px rgba(0,0,0,0.06)}
 .card-title{text-align:center;color:#1e73be;margin-bottom:18px;font-weight:700;font-size:28px}
 .page-body{padding:10px 6px}
-.toolbar{display:flex;justify-content:right;align-items:center;margin-bottom:12px}
-.search input{padding:8px 12px;border-radius:6px;border:1px solid #ccc;width:360px}
-.actions button,.actions .file-btn{background:#2ea44f;color:#fff;border:none;padding:8px 12px;border-radius:6px;cursor:pointer;margin-left:8px}
+.toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.toolbar.desktop-only{justify-content:flex-end}
+.toolbar.desktop-only .search{margin-right:auto}
+
+.search{flex:0 1 360px; max-width:360px}
+.search input{padding:8px 12px;border-radius:6px;border:1px solid #ccc;width:100%}
+.actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-shrink:0}
+.actions button,.actions .file-btn{background:#2ea44f;color:#fff;border:none;padding:10px 16px;border-radius:6px;cursor:pointer;font-weight:700}
+.actions button:first-child{background:#0d6efd}
+.actions button,.actions .file-btn{min-width:110px;text-align:center}
+.actions .file-btn{margin-left:0}
+.toolbar-lecturers{flex-wrap:nowrap}
+.toolbar-lecturers .search{flex:1 1 260px}
+.toolbar-lecturers .actions{flex:0 0 auto;justify-content:flex-end}
+.toolbar-lecturers .actions button:first-child{background:#0d6efd}
+.toolbar-students .actions{justify-content:flex-start}
+.dropdown{position:relative}
+.dropdown > button{background:#0d6efd;color:#fff;border:none;padding:10px 16px;border-radius:6px;cursor:pointer;font-weight:700;min-width:120px}
+  .dropdown-menu {
+    position: absolute;
+    top: 110%;
+    left: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    background: #fff;
+    border: 1px solid #e1e6ed;
+    border-radius: 8px;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.08);
+    padding: 10px;
+    min-width: 220px;
+    z-index: 30;
+    right: auto;
+  }
+.dropdown-menu .excel-btn{margin-left:0; text-align:left}
+.dropdown-menu button{width:100%; text-align:left}
 .file-btn input{display:none}
 .table{width:100%;border-collapse:collapse;margin-top:8px}
 .table th{background:#f6f8f9;text-align:center;padding:12px;border-bottom:1px solid #eee;color:#2b5f86}
@@ -1654,9 +1904,11 @@ function importStudentsFromExcel(e) {
 .actions-cell button{margin-right:6px;padding:6px 8px;border-radius:6px;border:1px solid #ccc;background:#fff;cursor:pointer}
 .empty{text-align:center;padding:18px;color:#777}
 .avatar-cell img{width:48px;height:48px;border-radius:6px;object-fit:cover}
-.modal{position:fixed;inset:0;background:rgba(10,10,10,0.35);display:flex;align-items:center;justify-content:center;overflow-y:auto;padding:20px 0}
-.modal-card{background:#fff;padding:18px;border-radius:10px;min-width:320px;max-height:90vh;overflow-y:auto;margin:auto}
-.modal-card.wide{min-width:760px;max-width:90vw}
+.modal{position:fixed;inset:0;background:rgba(10,10,10,0.35);display:flex;align-items:center;justify-content:center;overflow-y:auto;padding:20px 0;z-index:9998}
+/* Centered modal card: no positional offsets, flex-centering only */
+.modal-card{background:#fff;padding:18px;border-radius:10px;min-width:320px;max-height:90vh;overflow-y:auto;width:100%;max-width:960px;box-shadow:0 14px 40px rgba(0,0,0,0.25)}
+/* Wide variant for schedule form */
+.modal-card.wide{max-width:1100px;width:100%}
 .form-row{display:flex;flex-direction:column;margin:8px 0}
 .form-row label{font-weight:600;color:#2b7ab8;margin-bottom:6px}
 .form-row input[type='text'], .form-row input[type='email'], .form-row input[type='password'], .form-row input[type='date'], .form-row input[type='time'], .form-row select{padding:8px;border:1px solid #ddd;border-radius:6px}
@@ -1698,18 +1950,18 @@ button {
 
 /* Sửa */
 .actions-cell button:nth-child(1) {
-  background-color: rgb(12, 185, 115);
+  background-color: #0d6efd; /* Xanh nước biển - Sửa */
 }
 .actions-cell button:nth-child(1):hover {
-  background-color: rgb(12, 185, 115);
+  background-color: #0b5ed7;
 }
 
 /* Xóa */
 .actions-cell button:nth-child(2) {
-  background-color: rgb(12, 185, 115);
+  background-color: #dc3545; /* Đỏ - Xóa */
 }
 .actions-cell button:nth-child(2):hover {
-  background-color: rgb(12, 185, 115);
+  background-color: #bb2d3b;
 }
 
 /* === NÚT TRONG MODAL === */
@@ -1786,31 +2038,164 @@ button {
 .delete-all-btn:hover {
   background-color: #c82333;
 }
+
+/* === TOAST NOTIFICATION === */
+.toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 14px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  z-index: 9999;
+  max-width: 90vw;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+  animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+.toast-success {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.toast-error {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+.toast-info {
+  background: #d1ecf1;
+  color: #0c5460;
+  border: 1px solid #bee5eb;
+}
+
 </style>
 
 <style scoped>
 @media (max-width: 900px) {
+    /* Mobile: modal fills viewport width, content scrolls inside */
+    .modal-card, .modal-card.wide {
+      width: 95vw;
+      max-width: 95vw;
+    }
+  .hamburger { display: flex; }
+  .sidebar { display: none; }
+  .mobile-menu { display: block; }
+  .header {
+    padding: 6px 12px;
+  }
+  .ppp {
+    font-size: 5px;
+    line-height: 1.2;
+    text-align: left;
+    margin: 0;
+    padding: 0 8px;
+  }
+  .mobile-only{display:flex !important}
+  .desktop-only{display:none !important}
   .layout {
     flex-direction: column;
-  }
-  .sidebar {
-    width: 100%;
-    min-height: unset;
-    padding-top: 0;
-    order: 2;
   }
   .content {
     padding: 16px 4px;
   }
-  .card {
-    padding: 12px;
+  .toolbar {
+    flex-wrap: wrap;
+    align-items: center;
   }
-}
-
-@media (max-width: 600px) {
-  .header h1, .ppp {
-    font-size: 18px !important;
-    margin-left: 4px;
+  .toolbar .search {
+    flex: 1 1 100%;
+  }
+  .toolbar .actions {
+    flex: 0 0 auto;
+    justify-content: flex-end;
+  }
+  .toolbar-lecturers {
+    flex-wrap: wrap;
+  }
+  .toolbar-lecturers .search {
+    flex: 1 1 100%;
+  }
+  .toolbar-lecturers .actions {
+    flex: 0 0 auto;
+    justify-content: flex-end;
+  }
+  .toolbar-students {
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+  .toolbar-students .search {
+    flex: 1 1 auto;
+    min-width: 150px;
+  }
+  .toolbar-students .actions {
+    width: auto;
+    justify-content: flex-end;
+    flex-shrink: 0;
+  }
+  .toolbar-students .dropdown > button {
+    width: auto;
+    padding: 6px 8px;
+    font-size: 13px;
+    min-width: auto;
+    white-space: nowrap;
+    max-width: 80px;
+  }
+  .toolbar-students .dropdown > button {
+    width: 160px;
+    text-align: left;
+  }
+  .dropdown-menu {
+    position: static;
+    width: 100%;
+    box-shadow: none;
+    border: 1px solid #e1e6ed;
+    border-radius: 10px;
+    padding: 6px;
+    text-align: left;
+    max-width: 100%;
+    min-width: auto;
+  }
+  .dropdown-menu *,
+  .dropdown-menu button,
+  .dropdown-menu .excel-btn {
+    text-align: left !important;
+  }
+  .dropdown-menu button,
+  .dropdown-menu .excel-btn {
+    background: transparent !important;
+    color: #0d6efd;
+    border: none;
+    padding: 6px 8px;
+    text-align: left !important;
+    display: block;
+    width: 100%;
+    min-width: 0;
+    font-weight: 600;
+    border-radius: 6px;
+    font-size: 12px;
+    overflow-wrap: break-word;
+    word-break: break-word;
+    line-height: 1.4;
+  }
+  .dropdown-menu button:hover,
+  .dropdown-menu .excel-btn:hover {
+    background: #f5f8fc;
   }
   .sidebar nav li {
     padding: 10px 8px;
@@ -1903,5 +2288,77 @@ button {
   background: #f6f8f9;
   z-index: 10;
   box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+/* === RESPONSIVE TABLE TO CARD (<=768px) === */
+@media (max-width: 768px) {
+  .table {
+    border: none;
+    width: 100%;
+    font-size: 14px;
+  }
+  .table thead {
+    display: none;
+  }
+  .table tbody {
+    display: block;
+    width: 100%;
+  }
+  .table tr {
+    display: block;
+    background: #fff;
+    border: 1px solid #e3e8ee;
+    border-radius: 12px;
+    box-shadow: 0 6px 14px rgba(0,0,0,0.06);
+    margin-bottom: 12px;
+    overflow: hidden;
+  }
+  .table td {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: nowrap;
+    padding: 10px 12px;
+    border: none !important;
+    font-size: 14px;
+    text-align: left !important;
+    white-space: nowrap;
+  }
+  .table td:last-child {
+    border-bottom: none;
+  }
+  .table td::before {
+    content: attr(data-label);
+    font-weight: 700;
+    color: #0b4f85;
+    min-width: 110px;
+    flex-shrink: 0;
+    margin-right: 6px;
+    white-space: nowrap;
+  }
+  .table td a,
+  .table td button {
+    white-space: nowrap;
+  }
+  .actions-cell {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
+/* Hide less important columns on very small screens */
+@media (max-width: 640px) {
+  .table tr td:nth-child(9),
+  .table tr td:nth-child(10) {
+    display: none;
+  }
+  .table td {
+    font-size: 13px;
+  }
+  .table td::before {
+    min-width: 90px;
+    font-size: 13px;
+  }
 }
 </style>

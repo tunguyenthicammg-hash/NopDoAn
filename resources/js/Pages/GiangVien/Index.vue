@@ -1,6 +1,11 @@
 
 <template>
         <header class="header" >
+      <button class="hamburger-btn" @click="toggleSidebar" v-show="!isSidebarOpen">
+        <span class="hamburger-line"></span>
+        <span class="hamburger-line"></span>
+        <span class="hamburger-line"></span>
+      </button>
       <h1 class="ppp">HỆ THỐNG HỖ TRỢ GIÁM THỊ ĐIỂM DANH SINH VIÊN BẰNG HÌNH ẢNH</h1>
        <div class="sidebar-logout">
   <button class="logout" @click="logout">
@@ -10,27 +15,42 @@
 </div>
     </header>
 
+  <!-- Toast notification (mobile-friendly, desktop unaffected) -->
+  <div v-if="toast.show" class="toast" :class="['toast-' + toast.type]">
+    <span>{{ toast.message }}</span>
+  </div>
+
+  <!-- Confirm dialog (mobile-friendly) -->
+  <div v-if="confirmDialog.show" class="confirm-overlay" @click.self="handleConfirm(false)">
+    <div class="confirm-box">
+      <p class="confirm-message">{{ confirmDialog.message }}</p>
+      <div class="confirm-actions">
+        <button class="btn-confirm-yes" @click="handleConfirm(true)">Đồng ý</button>
+        <button class="btn-confirm-no" @click="handleConfirm(false)">Hủy</button>
+      </div>
+    </div>
+  </div>
+
   <div class="app">
 
     <!-- SIDEBAR -->
-    <aside class="sidebar">
+    <div v-if="isSidebarOpen" class="sidebar-overlay" @click="toggleSidebar"></div>
+    <aside class="sidebar" :class="{ 'sidebar-open': isSidebarOpen }">
       
 
       <nav class="menu">
-        <button @click="activeTab = 'info'" :class="{ active: activeTab === 'info' }">
+        <button @click="activeTab = 'info'; isSidebarOpen = false" :class="{ active: activeTab === 'info' }">
           Thông tin giảng viên
         </button>
-        <button @click="activeTab = 'schedule'" :class="{ active: activeTab === 'schedule' }">
+        <button @click="activeTab = 'schedule'; isSidebarOpen = false" :class="{ active: activeTab === 'schedule' }">
           Lịch gác thi & Phòng gác thi
         </button>
-        <button @click="activeTab = 'attendance'" :class="{ active: activeTab === 'attendance' }">
+        <button @click="activeTab = 'attendance'; isSidebarOpen = false" :class="{ active: activeTab === 'attendance' }">
           Điểm danh sinh viên
         </button>
-        <button @click="activeTab = 'result'" :class="{ active: activeTab === 'result' }">
-          Kết quả điểm danh
-        </button>
+      
 
-         <button @click="activeTab = 'password'" :class="{ active: activeTab === 'password' }">
+         <button @click="activeTab = 'password'; isSidebarOpen = false" :class="{ active: activeTab === 'password' }">
           Đổi mật khẩu
         </button>
       </nav>
@@ -70,7 +90,7 @@
 </section>
 
       <!-- Lịch gác thi -->
-       <section v-if="activeTab === 'schedule'">
+       <section v-if="activeTab === 'schedule'" class="schedule-section">
         <h2>LỊCH VÀ PHÒNG GÁC THI</h2>
 
         <!-- Tabs để filter theo status -->
@@ -105,7 +125,9 @@
           </button>
         </div>
 
-        <table class="table">
+        <!-- Desktop Table View -->
+        <div class="table-wrapper desktop-view">
+        <table class="table schedule-table">
         <thead>
           <tr>
             <th class="border border-gray-300 px-2 py-1">STT</th>
@@ -204,6 +226,107 @@
           </tr>
   </tbody>
 </table>
+        </div>
+
+        <!-- Mobile Card View -->
+        <div class="mobile-view">
+          <div v-if="filteredSchedules.length === 0" class="empty-state-mobile">
+            <div class="empty-icon-mobile">📋</div>
+            <p>{{ getEmptyMessage() }}</p>
+          </div>
+          
+          <div
+            v-for="(item, index) in filteredSchedules"
+            :key="item.id"
+            class="schedule-card"
+          >
+            <div class="card-header" :class="{
+              'card-header-pending': item.status === 'pending',
+              'card-header-confirmed': item.status === 'confirmed',
+              'card-header-rejected': item.status === 'rejected'
+            }">
+              <span class="card-number">STT {{ index + 1 }}</span>
+              <span :class="getStatusClass(item.status)" class="card-status">
+                {{ getStatusText(item.status) }}
+              </span>
+            </div>
+
+            <div class="card-body">
+              <div class="card-row">
+                <span class="card-label">Mã môn</span>
+                <span class="card-value">{{ item.ma_mon }}</span>
+              </div>
+
+              <div class="card-row">
+                <span class="card-label">Môn học</span>
+                <span class="card-value">{{ item.mon_hoc }}</span>
+              </div>
+
+              <div class="card-row">
+                <span class="card-label">Ngày thi</span>
+                <span class="card-value">{{ formatDate(item.ngay_thi) }} ({{ item.thu }})</span>
+              </div>
+
+              <div class="card-row">
+                <span class="card-label">Thời gian</span>
+                <span class="card-value">{{ item.gio_bat_dau }} - {{ item.gio_ket_thuc }}</span>
+              </div>
+
+              <div class="card-row">
+                <span class="card-label">Phòng thi</span>
+                <span class="card-value">{{ item.so_phong }} - {{ item.toa_nha }}</span>
+              </div>
+
+              <div class="card-row">
+                <span class="card-label">Vai trò</span>
+                <span :class="item.role === 'Trưởng phòng' ? 'badge-leader' : 'badge-supervisor'" class="card-badge">
+                  {{ item.role }}
+                </span>
+              </div>
+
+              <div class="card-row" v-if="item.status === 'confirmed'">
+                <span class="card-label">Điểm danh</span>
+                <span class="card-value">{{ item.attended_count || 0 }}/{{ item.total_students || 0 }}</span>
+              </div>
+            </div>
+
+            <div class="card-footer">
+              <!-- Nút điểm danh chỉ hiện với status confirmed -->
+              <div v-if="item.status === 'confirmed'" class="card-actions">
+                <button 
+                  @click="openAttendanceModal(item)" 
+                  class="btn-card btn-card-primary"
+                >
+                  📝 Điểm danh
+                </button>
+                <button 
+                  @click="viewStudentList(item)" 
+                  class="btn-card btn-card-secondary"
+                >
+                  👥 Xem DS
+                </button>
+              </div>
+              <!-- Status pending - hiện nút xác nhận -->
+              <div v-else-if="item.status === 'pending'" class="card-actions">
+                <button 
+                  @click="confirmSchedule(item.id)" 
+                  class="btn-card btn-card-confirm"
+                >
+                  ✓ Xác nhận
+                </button>
+              </div>
+              <!-- Status rejected hoặc khác -->
+              <div v-else class="card-actions">
+                <button 
+                  @click="viewScheduleDetail(item)" 
+                  class="btn-card btn-card-info"
+                >
+                  👁 Chi tiết
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
 
       <!-- Điểm danh sinh viên -->
@@ -217,7 +340,7 @@
             id="exam-select" 
             v-model="selectedExamForAttendance" 
             @change="loadAttendanceList"
-            class="exam-dropdown"
+            class="exam-dropdown desktop-only"
           >
             <option value="">-- Chọn lịch thi --</option>
             <option 
@@ -228,6 +351,54 @@
               {{ schedule.mon_hoc }} - {{ formatDate(schedule.ngay_thi) }} ({{ schedule.gio_bat_dau }}-{{ schedule.gio_ket_thuc }}) - Phòng {{ schedule.so_phong }}
             </option>
           </select>
+
+          <!-- Mobile exam picker (single button + modal accordion) -->
+          <div class="mobile-only">
+            <button type="button" class="exam-picker-button" @click="showExamPickerMobile = true">
+              {{ selectedExamForAttendance ? 'Đang chọn: ' + (currentExamInfo?.mon_hoc || 'Lịch thi') : 'Chọn lịch thi' }}
+              <span class="exam-picker-caret">⌄</span>
+            </button>
+
+            <div v-if="showExamPickerMobile" class="exam-picker-overlay" @click.self="showExamPickerMobile = false">
+              <div class="exam-picker-modal">
+                <div class="exam-picker-header">
+                  <span>Chọn lịch thi</span>
+                  <button type="button" class="exam-picker-close" @click="showExamPickerMobile = false">×</button>
+                </div>
+                <div class="mobile-exam-list">
+                  <div class="exam-card-mobile" v-for="schedule in confirmedSchedules" :key="schedule.exam_id">
+                    <button type="button" class="exam-card-summary" @click="toggleExamAccordion(schedule.exam_id)">
+                      <div class="exam-card-title">{{ schedule.mon_hoc }}</div>
+                      <div class="exam-card-date">{{ formatDate(schedule.ngay_thi) }}</div>
+                      <span class="exam-card-chevron" :class="{ open: expandedExamId === schedule.exam_id }">⌄</span>
+                    </button>
+
+                    <transition name="exam-accordion">
+                      <div v-show="expandedExamId === schedule.exam_id" class="exam-card-detail">
+                        <div class="exam-card-meta">🕒 {{ schedule.gio_bat_dau }} - {{ schedule.gio_ket_thuc }}</div>
+                        <div class="exam-card-meta">🏫 Phòng {{ schedule.so_phong }}{{ schedule.toa_nha ? ' - ' + schedule.toa_nha : '' }}</div>
+                        <div class="exam-card-meta exam-card-status-line">
+                          <span :class="getStatusClass(schedule.status)">{{ getStatusText(schedule.status) }}</span>
+                        </div>
+                        <div class="exam-card-action-row">
+                          <span v-if="schedule.exam_id === selectedExamForAttendance" class="exam-card-selected">Đang chọn</span>
+                          <button
+                            type="button"
+                            class="exam-card-choose"
+                            :class="{ active: schedule.exam_id === selectedExamForAttendance }"
+                            @click.stop="selectExamMobile(schedule.exam_id); showExamPickerMobile = false"
+                          >
+                            {{ schedule.exam_id === selectedExamForAttendance ? 'Đang chọn' : 'Chọn' }}
+                          </button>
+                        </div>
+                      </div>
+                    </transition>
+                  </div>
+                  <div v-if="confirmedSchedules.length === 0" class="exam-card-empty">Không có lịch thi xác nhận</div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- Thông tin lịch thi đã chọn -->
@@ -246,9 +417,11 @@
           </div>
           <div class="summary-item stats">
             <span class="label">Tình trạng:</span>
-            <span class="value">
-              <span class="stat-attended">✅ Đã điểm danh: {{ attendanceStats.attended }}</span> / 
-              <span class="stat-not-attended">⚠️ Chưa điểm danh: {{ attendanceStats.notAttended }}</span> / 
+            <span class="value stats-inline">
+              <span class="stat-attended">✅ Đã điểm danh: {{ attendanceStats.attended }}</span>
+              <span class="stat-separator">/</span>
+              <span class="stat-not-attended">⚠️ Chưa điểm danh: {{ attendanceStats.notAttended }}</span>
+              <span class="stat-separator">/</span>
               <span class="stat-total">📊 Tổng: {{ attendanceStats.total }}</span>
             </span>
           </div>
@@ -280,6 +453,58 @@
             </button>
           </div>
 
+          <!-- Search input (mobile-only) -->
+          <div class="attendance-search mobile-only">
+            <input
+              v-model="attendanceSearch"
+              type="text"
+              class="attendance-search-input"
+              placeholder="Nhập mã sinh viên (MSSV) để tìm.."
+            />
+          </div>
+          <!-- Single student detail card view (like image 2) -->
+          <div v-if="filteredAttendanceList.length === 1" class="student-detail-card">
+            <div class="student-detail-row">
+              <span class="detail-label">STT</span>
+              <span class="detail-value">1</span>
+            </div>
+            <div class="student-detail-row">
+              <span class="detail-label">MSSV</span>
+              <span class="detail-value"><strong>{{ filteredAttendanceList[0].mssv }}</strong></span>
+            </div>
+            <div class="student-detail-row">
+              <span class="detail-label">Họ và tên</span>
+              <span class="detail-value">{{ filteredAttendanceList[0].ho_va_ten }}</span>
+            </div>
+            <div class="student-detail-row">
+              <span class="detail-label">Lớp</span>
+              <span class="detail-value">{{ filteredAttendanceList[0].lop || 'N/A' }}</span>
+            </div>
+            <div class="student-detail-row">
+              <span class="detail-label">Trạng thái</span>
+              <span class="detail-value">
+                <span v-if="filteredAttendanceList[0].da_diem_danh" class="status-badge attended">✅ Đã điểm danh</span>
+                <span v-else class="status-badge not-attended">⚠️ Chưa điểm danh</span>
+              </span>
+            </div>
+            <div class="student-detail-row">
+              <span class="detail-label">Thời gian</span>
+              <span class="detail-value">
+                <span v-if="filteredAttendanceList[0].thoi_gian_diem_danh">{{ formatDateTime(filteredAttendanceList[0].thoi_gian_diem_danh) }}</span>
+                <span v-else class="text-muted">-</span>
+              </span>
+            </div>
+            <div class="student-detail-row">
+              <span class="detail-label">Phương thức</span>
+              <span class="detail-value">
+                <span v-if="filteredAttendanceList[0].phuong_thuc_diem_danh" class="method-badge">{{ getMethodLabel(filteredAttendanceList[0].phuong_thuc_diem_danh) }}</span>
+                <span v-else class="text-muted">-</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- Table view for multiple results (desktop only) -->
+          <div v-else class="attendance-table-wrapper desktop-attendance-view">
           <table class="attendance-table">
             <thead>
               <tr>
@@ -326,6 +551,52 @@
               </tr>
             </tbody>
           </table>
+          </div>
+
+            <!-- Mobile-only card list for all tabs -->
+            <div v-if="filteredAttendanceList.length !== 1" class="mobile-attendance-view">
+              <div
+                v-for="(student, index) in filteredAttendanceList"
+                :key="student.mssv"
+                class="student-card"
+                :class="{ 'student-card-attended': student.da_diem_danh }"
+              >
+                <div class="student-card-header">
+                  <span class="student-card-number">STT {{ index + 1 }}</span>
+                  <span v-if="student.da_diem_danh" class="badge-attended">✓ Đã điểm danh</span>
+                  <span v-else class="badge-not-attended">○ Chưa điểm danh</span>
+                </div>
+                <div class="student-card-body">
+                  <div class="student-card-row">
+                    <span class="student-card-label">MSSV</span>
+                    <span class="student-card-value"><strong>{{ student.mssv }}</strong></span>
+                  </div>
+                  <div class="student-card-row">
+                    <span class="student-card-label">Họ và tên</span>
+                    <span class="student-card-value">{{ student.ho_va_ten }}</span>
+                  </div>
+                  <div class="student-card-row">
+                    <span class="student-card-label">Lớp</span>
+                    <span class="student-card-value">{{ student.lop || 'N/A' }}</span>
+                  </div>
+                  <div class="student-card-row">
+                    <span class="student-card-label">Thời gian</span>
+                    <span class="student-card-value">
+                      <span v-if="student.thoi_gian_diem_danh">{{ formatDateTime(student.thoi_gian_diem_danh) }}</span>
+                      <span v-else class="text-muted">-</span>
+                    </span>
+                  </div>
+                  <div class="student-card-row">
+                    <span class="student-card-label">Phương thức</span>
+                    <span class="student-card-value">
+                      <span v-if="student.phuong_thuc_diem_danh" class="method-badge">{{ getMethodLabel(student.phuong_thuc_diem_danh) }}</span>
+                      <span v-else class="text-muted">-</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div v-if="filteredAttendanceList.length === 0" class="exam-card-empty">{{ getAttendanceEmptyMessage() }}</div>
+            </div>
         </div>
 
         <!-- Message khi chưa chọn lịch -->
@@ -335,31 +606,9 @@
         </div>
       </section>
 
-      <!-- Kết quả điểm danh -->
-      <section v-if="activeTab === 'result'">
-        <h2> KẾT QUẢ ĐIỂM DANH </h2>
-        <table class="table">
-          <thead>
-            <tr>
-              <th data-v-d31f6b30 class="border border-gray-300 px-2 py-1">MSSV</th>
-              <th data-v-d31f6b30 class="border border-gray-300 px-2 py-1">Họ tên</th>
-              <th data-v-d31f6b30 class="border border-gray-300 px-2 py-1">Ngày thi</th>
-              <th data-v-d31f6b30 class="border border-gray-300 px-2 py-1">Trạng thái</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="record in results" :key="record.id">
-              <td>{{ record.studentId }}</td>
-              <td>{{ record.name }}</td>
-              <td>{{ record.date }}</td>
-              <td>{{ record.status }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
+      
 
            <!-- Đổi mật khẩu -->
-    <!-- Đổi mật khẩu -->
 <section v-if="activeTab === 'password'" class="centered-section">
   <h2 class="tt">ĐỔI MẬT KHẨU</h2>
 
@@ -507,6 +756,8 @@
           </p>
         </div>
 
+        <!-- Desktop Table View -->
+        <div class="student-list-table-wrapper desktop-student-view">
         <table class="student-list-table">
           <thead>
             <tr>
@@ -536,6 +787,45 @@
             </tr>
           </tbody>
         </table>
+        </div>
+
+        <!-- Mobile Card View -->
+        <div class="mobile-student-view">
+          <div 
+            v-for="(student, index) in studentList"
+            :key="student.mssv"
+            class="student-card"
+            :class="{ 'student-card-attended': student.da_diem_danh }"
+          >
+            <div class="student-card-header">
+              <span class="student-card-number">STT {{ index + 1 }}</span>
+              <span v-if="student.da_diem_danh" class="badge-attended">✓ Đã điểm danh</span>
+              <span v-else class="badge-not-attended">○ Chưa điểm danh</span>
+            </div>
+
+            <div class="student-card-body">
+              <div class="student-card-row">
+                <span class="student-card-label">MSSV</span>
+                <span class="student-card-value">{{ student.mssv }}</span>
+              </div>
+
+              <div class="student-card-row">
+                <span class="student-card-label">Họ và tên</span>
+                <span class="student-card-value">{{ student.ho_va_ten }}</span>
+              </div>
+
+              <div class="student-card-row">
+                <span class="student-card-label">Lớp</span>
+                <span class="student-card-value">{{ student.lop || 'N/A' }}</span>
+              </div>
+
+              <div class="student-card-row" v-if="student.thoi_gian_diem_danh">
+                <span class="student-card-label">Thời gian</span>
+                <span class="student-card-value">{{ formatDateTime(student.thoi_gian_diem_danh) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -544,9 +834,43 @@
 <script setup>
 import { router } from '@inertiajs/vue3'
 import axios from 'axios'
-import { ref, onMounted, computed, nextTick } from 'vue'
+import { ref, onMounted, computed, nextTick, reactive } from 'vue'
 // tab hiện tại
 const activeTab = ref('info')
+const isSidebarOpen = ref(false)
+
+// Toast notification (mobile friendly, desktop unaffected)
+const toast = reactive({ show: false, message: '', type: 'info' })
+let toastTimer = null
+const notify = (message, type = 'info') => {
+  toast.message = message
+  toast.type = type
+  toast.show = true
+  if (toastTimer) clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => {
+    toast.show = false
+  }, 3000)
+}
+
+// Confirm dialog (mobile friendly)
+const confirmDialog = reactive({ show: false, message: '', resolver: null })
+const askConfirm = (message) => {
+  return new Promise((resolve) => {
+    confirmDialog.message = message
+    confirmDialog.show = true
+    confirmDialog.resolver = resolve
+  })
+}
+const handleConfirm = (result) => {
+  if (confirmDialog.resolver) confirmDialog.resolver(result)
+  confirmDialog.show = false
+  confirmDialog.message = ''
+  confirmDialog.resolver = null
+}
+
+const toggleSidebar = () => {
+  isSidebarOpen.value = !isSidebarOpen.value
+}
  // mật khẩu
  const password = ref({ old: '', new: '', confirm: '' })
  const passwordMessage = ref('')
@@ -602,6 +926,8 @@ const selectedExamForAttendance = ref('')
 const attendanceListForDisplay = ref([])
 const attendanceFilter = ref('all') // 'all', 'attended', 'not-attended'
 const currentExamInfo = ref(null)
+const expandedExamId = ref(null)
+const showExamPickerMobile = ref(false)
 
 // Computed properties để filter lịch theo status
 const pendingSchedules = computed(() => 
@@ -632,9 +958,12 @@ const notAttendedStudents = computed(() =>
 )
 
 const filteredAttendanceList = computed(() => {
-  if (attendanceFilter.value === 'attended') return attendedStudents.value
-  if (attendanceFilter.value === 'not-attended') return notAttendedStudents.value
-  return attendanceListForDisplay.value
+  let base = attendanceListForDisplay.value
+  if (attendanceFilter.value === 'attended') base = attendedStudents.value
+  if (attendanceFilter.value === 'not-attended') base = notAttendedStudents.value
+  if (!attendanceSearch.value?.trim()) return base
+  const q = attendanceSearch.value.trim().toLowerCase()
+  return base.filter(s => (s.mssv && String(s.mssv).toLowerCase().includes(q)))
 })
 
 const attendanceStats = computed(() => {
@@ -645,6 +974,9 @@ const attendanceStats = computed(() => {
     total: attendanceListForDisplay.value.length
   }
 })
+
+// Search state
+const attendanceSearch = ref('')
 
 // Helper functions
 const getStatusClass = (status) => {
@@ -688,12 +1020,13 @@ const formatDateTime = (dateStr) => {
 }
 
 const viewScheduleDetail = (item) => {
-  alert(`Chi tiết lịch gác:\n\nMôn: ${item.mon_hoc}\nNgày: ${formatDate(item.ngay_thi)}\nGiờ: ${item.gio_bat_dau} - ${item.gio_ket_thuc}\nPhòng: ${item.so_phong} (${item.toa_nha})\nVai trò: ${item.role}\nTrạng thái: ${getStatusText(item.status)}`)
+  notify(`Chi tiết lịch gác:\nMôn: ${item.mon_hoc}\nNgày: ${formatDate(item.ngay_thi)}\nGiờ: ${item.gio_bat_dau} - ${item.gio_ket_thuc}\nPhòng: ${item.so_phong} (${item.toa_nha})\nVai trò: ${item.role}\nTrạng thái: ${getStatusText(item.status)}`, 'info')
 }
 
 // Xác nhận lịch gác
 const confirmSchedule = async (id) => {
-  if (!confirm('Bạn có chắc chắn muốn xác nhận lịch gác thi này không?')) return
+  const ok = await askConfirm('Bạn có chắc chắn muốn xác nhận lịch gác thi này không?')
+  if (!ok) return
 
   try {
     // Get CSRF token
@@ -706,13 +1039,13 @@ const confirmSchedule = async (id) => {
       }
     })
     if (res.data.success) {
-      alert('✅ Đã xác nhận lịch gác thi thành công!')
+      notify('✅ Đã xác nhận lịch gác thi thành công!', 'success')
       await fetchSchedules() // Reload danh sách
     }
   } catch (err) {
     console.error('Lỗi khi xác nhận:', err)
     console.error('Error response:', err.response)
-    alert('❌ Không thể xác nhận lịch gác: ' + (err.response?.data?.message || err.message))
+    notify('❌ Không thể xác nhận lịch gác: ' + (err.response?.data?.message || err.message), 'error')
   }
 }
 
@@ -726,12 +1059,12 @@ const rejectSchedule = async (id) => {
       ly_do: lyDo
     })
     if (res.data.success) {
-      alert('✅ Đã từ chối lịch gác thi')
+      notify('✅ Đã từ chối lịch gác thi', 'success')
       await fetchSchedules() // Reload danh sách
     }
   } catch (err) {
     console.error('Lỗi khi từ chối:', err)
-    alert('❌ Không thể từ chối lịch gác: ' + (err.response?.data?.message || err.message))
+    notify('❌ Không thể từ chối lịch gác: ' + (err.response?.data?.message || err.message), 'error')
   }
 }
 
@@ -790,7 +1123,7 @@ const startQRScanner = async () => {
     )
   } catch (err) {
     console.error('Error starting QR scanner:', err)
-    alert('❌ Không thể khởi động camera. Vui lòng kiểm tra quyền truy cập camera.')
+    notify('❌ Không thể khởi động camera. Vui lòng kiểm tra quyền truy cập camera.', 'error')
     isScanning.value = false
   }
 }
@@ -820,7 +1153,7 @@ const onScanSuccess = (decodedText, decodedResult) => {
     stopQRScanner()
     lookupStudent(mssv, 'qr_code')
   } else {
-    alert('❌ Mã QR không hợp lệ!')
+    notify('❌ Mã QR không hợp lệ!', 'error')
   }
 }
 
@@ -832,7 +1165,7 @@ const onScanFailure = (error) => {
 // Nhập MSSV thủ công
 const submitManualMssv = () => {
   if (!manualMssv.value.trim()) {
-    alert('⚠️ Vui lòng nhập MSSV')
+    notify('⚠️ Vui lòng nhập MSSV', 'warning')
     return
   }
   lookupStudent(manualMssv.value.trim(), 'manual')
@@ -850,11 +1183,11 @@ const lookupStudent = async (mssv, method) => {
       showStudentConfirmModal.value = true
       showAttendanceModal.value = false
     } else {
-      alert('❌ Không tìm thấy sinh viên với MSSV: ' + mssv)
+      notify('❌ Không tìm thấy sinh viên với MSSV: ' + mssv, 'error')
     }
   } catch (err) {
     console.error('Lỗi khi tìm sinh viên:', err)
-    alert('❌ Không thể tìm sinh viên: ' + (err.response?.data?.message || err.message))
+    notify('❌ Không thể tìm sinh viên: ' + (err.response?.data?.message || err.message), 'error')
   }
 }
 
@@ -870,13 +1203,13 @@ const confirmAttendance = async () => {
     })
     
     if (res.data.success) {
-      alert('✅ Đã điểm danh thành công cho sinh viên: ' + foundStudent.value.Ho_va_ten)
+      notify('✅ Đã điểm danh thành công cho sinh viên: ' + foundStudent.value.Ho_va_ten, 'success')
       closeStudentConfirmModal()
       await fetchSchedules() // Refresh để update số lượng đã điểm danh
     }
   } catch (err) {
     console.error('Lỗi khi điểm danh:', err)
-    alert('❌ Không thể điểm danh: ' + (err.response?.data?.message || err.message))
+    notify('❌ Không thể điểm danh: ' + (err.response?.data?.message || err.message), 'error')
   }
 }
 
@@ -903,7 +1236,7 @@ const viewStudentList = async (schedule) => {
     }
   } catch (err) {
     console.error('Lỗi khi lấy danh sách sinh viên:', err)
-    alert('❌ Không thể lấy danh sách sinh viên')
+    notify('❌ Không thể lấy danh sách sinh viên', 'error')
   }
 }
 
@@ -936,9 +1269,20 @@ const loadAttendanceList = async () => {
     }
   } catch (err) {
     console.error('Lỗi khi tải danh sách:', err)
-    alert('❌ Không thể tải danh sách sinh viên')
+    notify('❌ Không thể tải danh sách sinh viên', 'error')
     attendanceListForDisplay.value = []
   }
+}
+
+// Mobile select helper
+const selectExamMobile = (examId) => {
+  selectedExamForAttendance.value = examId
+  loadAttendanceList()
+}
+
+// Toggle accordion for mobile exam cards
+const toggleExamAccordion = (examId) => {
+  expandedExamId.value = expandedExamId.value === examId ? null : examId
 }
 
 // Helper: Lấy label phương thức điểm danh
@@ -1016,10 +1360,10 @@ onMounted(() => {
 const updateInfo = async() => {
   try {
     await axios.put('/giangvien/capnhat', teacher.value)
-    alert('Cập nhật thành công.')
+    notify('Cập nhật thành công.', 'success')
   } catch (err) {
     console.error('updateInfo failed', err)
-    alert('Cập nhật thất bại.')
+    notify('Cập nhật thất bại.', 'error')
   }
 }
 
@@ -1102,6 +1446,95 @@ onMounted(() => {
   background: #ecf0f1;
   padding: 30px;
 }
+
+/* Toast notification (mobile-friendly, desktop unaffected) */
+.toast {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  padding: 12px 16px;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 260px;
+  max-width: 90vw;
+  color: #333;
+  font-weight: 600;
+}
+
+/* Confirm dialog */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2001;
+}
+
+.confirm-box {
+  background: #fff;
+  padding: 16px;
+  border-radius: 12px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+  width: 90%;
+  max-width: 360px;
+}
+
+.confirm-message {
+  margin: 0 0 12px;
+  font-weight: 600;
+  color: #333;
+  white-space: pre-line;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.btn-confirm-yes,
+.btn-confirm-no {
+  flex: 1;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.btn-confirm-yes {
+  background: #27ae60;
+  color: #fff;
+}
+
+.btn-confirm-no {
+  background: #bdc3c7;
+  color: #2c3e50;
+}
+
+.toast-success {
+  border-left: 6px solid #27ae60;
+}
+
+.toast-error {
+  border-left: 6px solid #e74c3c;
+}
+
+.toast-warning {
+  border-left: 6px solid #f39c12;
+}
+
+.toast-info {
+  border-left: 6px solid #2980b9;
+}
 * {
   font-family: "Times New Roman", Times, serif;
 }
@@ -1116,6 +1549,7 @@ h2 {
 .tt{
   color: #0c7de7;
   font-size: 28px;
+  white-space: nowrap;
 }
 .h1, h2, label, li, p {
   color: #0c7de7;
@@ -1173,7 +1607,9 @@ h2 {
 }
 
 .form-row input {
-  flex: 1;
+  flex: 1 1 100%;
+  width: 100%;
+  max-width: 100%;
   padding: 10px 12px;
   border: 1px solid #ccc;
   border-radius: 6px;
@@ -1212,9 +1648,38 @@ h2 {
   cursor: pointer;
 }
 
-.table{width:100%;border-collapse:collapse;margin-top:8px}
-.table th{background:#f6f8f9;text-align:center;padding:12px;border-bottom:1px solid #eee;color:#2b5f86}
-.table td{padding:12px;border-bottom:1px solid #f1f4f5}
+.schedule-section {
+  width: 100%;
+  overflow: hidden;
+}
+
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  margin-top: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background: white;
+  min-width: 1200px;
+}
+
+.table th {
+  background: #f6f8f9;
+  text-align: center;
+  padding: 12px;
+  border-bottom: 1px solid #eee;
+  color: #2b5f86;
+}
+
+.table td {
+  padding: 12px;
+  border-bottom: 1px solid #f1f4f5;
+}
 
 .attendance-box {
   display: flex;
@@ -1240,10 +1705,10 @@ video {
 
 /* Tabs cho lịch gác thi */
 .schedule-tabs {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 12px;
   margin-bottom: 20px;
-  flex-wrap: wrap;
 }
 
 .tab-button {
@@ -1323,6 +1788,7 @@ video {
   display: flex;
   flex-direction: column;
   gap: 6px;
+  align-items: center;
 }
 
 .btn-confirm {
@@ -1384,6 +1850,7 @@ video {
   font-size: 24px;
   letter-spacing: 1px;
   box-shadow: 0 2px 6px rgba(154, 189, 237, 0.25);
+  position: relative;
 }
 
 .header h1 {
@@ -1396,6 +1863,1084 @@ video {
   font-size: 38px;
   font-weight: 800; /* ✅ in đậm hơn */
    margin-left: 20px;
+}
+
+/* Hamburger button - hidden on desktop */
+.hamburger-btn {
+  display: none;
+  background: rgba(255, 255, 255, 0.25);
+  border: none;
+  color: white;
+  width: 50px;
+  height: 50px;
+  border-radius: 10px;
+  cursor: pointer;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 12px;
+  transition: all 0.3s ease;
+  z-index: 1001;
+  flex-shrink: 0;
+  margin-right: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.hamburger-btn:hover {
+  background: rgba(255, 255, 255, 0.4);
+  transform: scale(1.08);
+}
+
+.hamburger-btn:active {
+  transform: scale(0.95);
+}
+
+/* 3 sọc ngang màu trắng */
+.hamburger-line {
+  width: 26px;
+  height: 3px;
+  background-color: white;
+  border-radius: 2px;
+  transition: all 0.3s ease;
+}
+
+.hamburger-btn:hover .hamburger-line {
+  background-color: white;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+}
+
+/* Sidebar overlay for mobile */
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 998;
+  animation: fadeIn 0.3s;
+}
+
+/* ==================== CARD LAYOUT STYLES ==================== */
+
+/* Desktop view - show table */
+.desktop-view {
+  display: block !important;
+}
+
+/* Mobile view - hide by default */
+.mobile-view {
+  display: none;
+}
+
+/* Schedule Card Styles */
+.schedule-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 16px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  border: 1px solid #e0e0e0;
+}
+
+.schedule-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.card-number {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.card-status {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+.card-body {
+  padding: 16px;
+}
+
+.card-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.card-row:last-of-type {
+  border-bottom: none;
+}
+
+.card-label {
+  font-weight: 600;
+  color: #555;
+  font-size: 14px;
+  flex: 0 0 auto;
+  min-width: 100px;
+}
+
+.card-value {
+  text-align: right;
+  color: #333;
+  font-size: 14px;
+  font-weight: 500;
+  flex: 1;
+  margin-left: 10px;
+  word-break: break-word;
+}
+
+.card-badge {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: white;
+  margin-left: auto;
+}
+
+.card-footer {
+  padding: 12px 16px;
+  background: #f8f9fa;
+  border-top: 1px solid #e0e0e0;
+}
+
+.card-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-card {
+  flex: 1;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.btn-card-primary {
+  background: #4caf50;
+  color: white;
+}
+
+.btn-card-primary:hover {
+  background: #45a049;
+  transform: translateY(-2px);
+}
+
+.btn-card-secondary {
+  background: #2196f3;
+  color: white;
+}
+
+.btn-card-secondary:hover {
+  background: #1976d2;
+  transform: translateY(-2px);
+}
+
+.btn-card-confirm {
+  background: #4caf50;
+  color: white;
+}
+
+.btn-card-confirm:hover {
+  background: #45a049;
+  transform: translateY(-2px);
+}
+
+.btn-card-info {
+  background: #17a2b8;
+  color: white;
+}
+
+.btn-card-info:hover {
+  background: #138496;
+  transform: translateY(-2px);
+}
+
+.empty-state-mobile {
+  text-align: center;
+  padding: 60px 20px;
+  color: #999;
+}
+
+.empty-icon-mobile {
+  font-size: 80px;
+  margin-bottom: 20px;
+  opacity: 0.5;
+}
+
+.empty-state-mobile p {
+  font-size: 16px;
+  font-weight: 500;
+  color: #666;
+}
+
+/* Mobile responsive styles */
+@media (max-width: 900px) {
+  /* Prevent horizontal overflow on mobile */
+  body, html {
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+
+  .app {
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+
+  /* Show hamburger button on mobile */
+  .hamburger-btn {
+    display: flex;
+  }
+
+  /* Hide sidebar by default on mobile */
+  .sidebar {
+    position: fixed;
+    left: -280px;
+    top: 0;
+    height: 100vh;
+    width: 260px;
+    z-index: 999;
+    transition: left 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+    overflow-y: auto;
+  }
+
+  /* Show sidebar when open */
+  .sidebar.sidebar-open {
+    left: 0;
+  }
+
+  /* Show overlay when sidebar is open */
+  .sidebar-overlay {
+    display: block;
+  }
+
+  /* Adjust header layout */
+  .header {
+    padding: 10px 12px;
+    gap: 8px;
+    width: 100%;
+    max-width: 100vw;
+    box-sizing: border-box;
+    overflow-x: hidden;
+  }
+
+  /* Adjust header text size */
+  .ppp {
+    font-size: 14px;
+    margin-left: 0;
+    line-height: 1.3;
+    flex: 1;
+    text-align: center;
+  }
+
+  .header h1 {
+    font-size: 14px;
+  }
+
+  /* Adjust logout button container */
+  .sidebar-logout {
+    flex-shrink: 0;
+  }
+
+  /* Adjust main content */
+  .main-content {
+    padding: 15px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden;
+  }
+
+  section {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden;
+  }
+
+  /* Make tables responsive - hide all table wrappers and desktop views */
+  .table-wrapper,
+  .desktop-view,
+  .desktop-student-view,
+  .student-list-table-wrapper,
+  .student-list-modal .desktop-view,
+  .student-list-modal .desktop-student-view,
+  .student-list-modal table,
+  .student-list-modal thead,
+  .student-list-modal tbody,
+  .desktop-attendance-view {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* Show mobile card view on mobile */
+  .mobile-view,
+  .mobile-student-view {
+    display: block !important;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Show attendance mobile cards */
+  .mobile-attendance-view {
+    display: block !important;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* Hide dropdown on mobile, show card list */
+  .desktop-only {
+    display: none !important;
+  }
+  .mobile-only {
+    display: block !important;
+  }
+  .mobile-exam-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-top: 6px;
+  }
+  .exam-picker-button {
+    width: 100%;
+    padding: 10px 12px;
+    background: #ffffff;
+    border: 1px solid #e0e0e0;
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    font-size: 14px;
+    font-weight: 600;
+    color: #2c3e50;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .exam-picker-caret {
+    color: #888;
+    font-size: 12px;
+    margin-left: 8px;
+  }
+  .exam-picker-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.2s ease;
+  }
+  .exam-picker-modal {
+    width: 92vw;
+    max-height: 75vh;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.2);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .exam-picker-header {
+    padding: 10px 12px;
+    background: #f7f7f9;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-weight: 700;
+    color: #2c3e50;
+  }
+  .exam-picker-close {
+    border: none;
+    background: transparent;
+    font-size: 18px;
+    line-height: 1;
+    color: #888;
+    cursor: pointer;
+  }
+  .exam-picker-modal .mobile-exam-list {
+    padding: 10px;
+    overflow-y: auto;
+  }
+  .exam-card-mobile {
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    overflow: hidden;
+  }
+  .exam-card-summary {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    gap: 8px;
+    padding: 10px 12px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    text-align: left;
+    box-sizing: border-box;
+  }
+  .exam-card-title {
+    font-weight: 700;
+    color: #2c3e50;
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+    line-height: 1.2;
+  }
+  .exam-card-date {
+    font-size: 12px;
+    color: #555;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .exam-card-chevron {
+    font-size: 12px;
+    color: #888;
+    transition: transform 0.2s ease;
+    flex-shrink: 0;
+  }
+  .exam-card-chevron.open {
+    transform: rotate(180deg);
+  }
+  .exam-card-detail {
+    padding: 0 12px 10px;
+    font-size: 12px;
+    color: #555;
+    line-height: 1.35;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+  .exam-card-meta {
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    word-break: break-word;
+  }
+  .exam-card-status-line {
+    margin-top: 4px;
+  }
+  .exam-card-action-row {
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .exam-card-selected {
+    color: #27ae60;
+    font-weight: 700;
+    font-size: 12px;
+  }
+  .exam-card-choose {
+    border: 1px solid #d8d8d8;
+    background: #f5f5f5;
+    color: #555;
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: background 0.2s, border-color 0.2s, color 0.2s;
+  }
+  .exam-card-choose.active {
+    background: #e8f7ee;
+    border-color: #27ae60;
+    color: #1f8b4e;
+  }
+  .exam-accordion-enter-active,
+  .exam-accordion-leave-active {
+    transition: max-height 0.2s ease, opacity 0.2s ease;
+  }
+  .exam-accordion-enter-from,
+  .exam-accordion-leave-to {
+    max-height: 0;
+    opacity: 0;
+  }
+  .exam-accordion-enter-to,
+  .exam-accordion-leave-from {
+    max-height: 200px;
+    opacity: 1;
+  }
+  .exam-card-empty {
+    text-align: center;
+    color: #888;
+    font-size: 12px;
+    padding: 8px 0;
+  }
+
+  /* Mobile card styles */
+  .schedule-card {
+    margin-bottom: 12px;
+    border-radius: 10px;
+  }
+
+  .card-header {
+    padding: 12px 14px;
+  }
+
+  .card-header-pending {
+    background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%) !important;
+  }
+
+  .card-header-confirmed {
+    background: linear-gradient(135deg, #27ae60 0%, #229954 100%) !important;
+  }
+
+  .card-header-rejected {
+    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%) !important;
+  }
+
+  .card-number {
+    font-size: 13px;
+  }
+
+  .card-body {
+    padding: 14px;
+  }
+
+  .card-row {
+    padding: 5px 0;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .card-label {
+    font-size: 13px;
+    min-width: 80px;
+    margin-bottom: 0;
+    flex-shrink: 0;
+  }
+
+  .card-value {
+    text-align: left;
+    font-size: 13px;
+    margin-left: 10px;
+    flex: 1;
+    word-break: break-word;
+  }
+
+  .card-badge {
+    font-size: 11px;
+    margin-left: 0;
+  }
+
+  .card-footer {
+    padding: 10px 14px;
+  }
+
+  .card-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .btn-card {
+    font-size: 13px;
+    padding: 10px 12px;
+  }
+
+  .table {
+    font-size: 10px;
+    width: 100%;
+    min-width: 650px;
+    table-layout: auto;
+  }
+
+  .table th,
+  .table td {
+    padding: 6px 3px;
+    font-size: 10px;
+    word-wrap: break-word;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 120px;
+  }
+
+  .table th:first-child,
+  .table td:first-child {
+    max-width: 30px;
+  }
+
+  .table td:nth-child(3) {
+    white-space: normal;
+    max-width: 100px;
+  }
+
+  /* Prevent badges and buttons from causing overflow */
+  .badge-leader,
+  .badge-supervisor,
+  .status-pending,
+  .status-confirmed,
+  .status-rejected {
+    max-width: 100%;
+    word-break: break-word;
+    white-space: normal;
+  }
+
+  .btn-confirm,
+  .btn-reject,
+  .btn-view,
+  .btn-attendance,
+  .btn-view-list {
+    max-width: 100%;
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  .schedule-tabs {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 4px;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .tab-button {
+    padding: 8px 8px;
+    font-size: 10px;
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Attendance page mobile adjustments */
+  .attendance-selector {
+    padding: 15px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .attendance-selector label {
+    font-size: 14px;
+  }
+
+  .exam-dropdown {
+    font-size: 13px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .attendance-summary-box {
+    padding: 15px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .summary-item {
+    flex-direction: row;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .summary-item .label {
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+
+  .summary-item .value {
+    font-size: 13px;
+    flex: 1;
+  }
+
+  .summary-item.stats .value {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .stat-attended,
+  .stat-not-attended,
+  .stat-total {
+    font-size: 12px;
+  }
+
+  .filter-tabs {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    width: 100%;
+    max-width: 100%;
+    gap: 6px;
+  }
+
+  .filter-tab {
+    flex: 1;
+    min-width: 0;
+    padding: 10px 8px;
+    font-size: 11px;
+    box-sizing: border-box;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .attendance-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+  }
+
+  .attendance-table {
+    font-size: 10px;
+    width: 100%;
+    min-width: 600px;
+    table-layout: auto;
+  }
+
+  .attendance-table th,
+  .attendance-table td {
+    padding: 6px 3px;
+    font-size: 10px;
+    word-wrap: break-word;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .attendance-table th:first-child,
+  .attendance-table td:first-child {
+    max-width: 35px;
+  }
+
+  .attendance-table td:nth-child(3) {
+    white-space: normal;
+  }
+
+  .status-badge {
+    font-size: 9px;
+    padding: 3px 6px;
+  }
+
+  .method-badge {
+    font-size: 9px;
+    padding: 2px 6px;
+  }
+
+  .attendance-count {
+    font-size: 10px;
+    padding: 2px 6px;
+  }
+
+  .btn-attendance,
+  .btn-view-list {
+    font-size: 10px;
+    padding: 5px 8px;
+  }
+
+  .btn-confirm,
+  .btn-reject,
+  .btn-view {
+    font-size: 10px;
+    padding: 5px 10px;
+  }
+
+  /* Adjust title on mobile */
+  .tt {
+    font-size: 18px;
+    white-space: normal;
+    text-align: center;
+    word-wrap: break-word;
+  }
+
+  /* Schedule section title on mobile */
+  .schedule-section h2 {
+    font-size: 16px !important;
+    white-space: nowrap !important;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Adjust form on mobile */
+  .info-form {
+    width: 100%;
+    max-width: 100%;
+    padding: 20px 15px;
+    box-sizing: border-box;
+  }
+
+  .form-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .form-row label {
+    width: 100%;
+    text-align: left;
+    font-size: 16px;
+  }
+
+  /* Adjust schedule tabs */
+  .schedule-tabs {
+    flex-direction: column;
+  }
+
+  .tab-button {
+    width: 100%;
+  }
+
+  /* Adjust filter tabs */
+  .filter-tabs {
+    flex-direction: column;
+  }
+
+  .filter-tab {
+    width: 100%;
+    min-width: auto;
+  }
+
+  /* Adjust modal for mobile */
+  .modal-content {
+    width: 95%;
+    max-height: 85vh;
+    max-width: 100%;
+  }
+
+  .student-list-modal {
+    width: 95%;
+    max-height: 80vh;
+  }
+
+  .list-info {
+    padding: 12px;
+    margin-bottom: 15px;
+  }
+
+  .list-info p {
+    margin: 3px 0;
+    font-size: 12px;
+  }
+
+  .attendance-summary {
+    font-size: 12px;
+    margin-top: 8px;
+  }
+
+  /* Hide table and wrapper on mobile */
+  .desktop-student-view,
+  .student-list-table-wrapper {
+    display: none !important;
+  }
+
+  /* Show mobile student card view on mobile */
+  .mobile-student-view {
+    display: block !important;
+  }
+
+  /* Toast on mobile */
+  .toast {
+    top: 50px;
+    width: 90%;
+    max-width: 90%;
+    font-size: 13px;
+    padding: 10px 14px;
+  }
+
+  .confirm-box {
+    width: 92%;
+    max-width: 92%;
+  }
+
+  .student-card {
+    margin-bottom: 10px;
+    border-radius: 8px;
+    width: 100%;
+    box-sizing: border-box;
+    overflow-x: hidden;
+  }
+
+  .student-card-header {
+    padding: 10px 12px;
+  }
+
+  .student-card-number {
+    font-size: 12px;
+  }
+
+  .student-card-body {
+    padding: 10px 12px;
+  }
+
+  .student-card-row {
+    padding: 6px 0;
+  }
+
+  .student-card-label {
+    font-size: 11px;
+  }
+
+  .student-card-value {
+    font-size: 11px;
+  }
+
+  .student-list-table {
+    margin-top: 0;
+    min-width: 500px;
+  }
+
+  .student-list-table th,
+  .student-list-table td {
+    padding: 8px 6px;
+    font-size: 11px;
+  }
+
+  .student-list-table th {
+    font-size: 10px;
+  }
+
+  .badge-attended,
+  .badge-not-attended {
+    padding: 3px 6px;
+    font-size: 10px;
+  }
+
+  /* Adjust attendance actions */
+  .attendance-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .btn-attendance,
+  .btn-view-list {
+    width: 100%;
+  }
+
+  /* Smaller logout button on mobile */
+  .logout {
+    width: 35px;
+    height: 35px;
+    margin: 8px;
+  }
+
+  .logout i {
+    font-size: 16px;
+  }
+}
+
+/* Extra small screens */
+@media (max-width: 480px) {
+  .ppp {
+    font-size: 11px;
+  }
+
+  .hamburger-btn {
+    width: 45px;
+    height: 45px;
+    font-size: 20px;
+    margin-right: 8px;
+  }
+
+  .logout {
+    width: 32px;
+    height: 32px;
+    margin: 5px;
+  }
+
+  .logout i {
+    font-size: 14px;
+  }
+
+  .schedule-tabs {
+    grid-template-columns: 1fr;
+  }
+
+  .table {
+    min-width: 600px;
+    font-size: 9px;
+  }
+
+  .table th,
+  .table td {
+    padding: 5px 2px;
+    font-size: 9px;
+  }
+
+  .attendance-table {
+    min-width: 550px;
+    font-size: 9px;
+  }
+
+  .attendance-table th,
+  .attendance-table td {
+    padding: 5px 2px;
+    font-size: 9px;
+  }
+
+  .filter-tabs {
+    gap: 8px;
+  }
+
+  .summary-item .value {
+    font-size: 12px;
+  }
+
+  .schedule-tabs {
+    flex-direction: column;
+  }
+
+  .tab-button {
+    flex: 1 1 100%;
+  }
+}
+
+/* Tablet responsive */
+@media (max-width: 1024px) and (min-width: 901px) {
+  .sidebar {
+    width: 220px;
+  }
+
+  .ppp {
+    font-size: 28px;
+  }
+
+  .main-content {
+    padding: 20px;
+  }
 }
 
 /* ==================== ATTENDANCE STYLES ==================== */
@@ -1754,11 +3299,99 @@ video {
   margin-top: 15px;
 }
 
+.student-list-table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  width: 100%;
+}
+
+/* Student Card Styles */
+.student-card {
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 12px;
+  overflow: hidden;
+  border: 1px solid #e0e0e0;
+}
+
+.student-card-attended {
+  border-left: 4px solid #4caf50;
+}
+
+.student-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  background: #f5f5f5;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.student-card-number {
+  font-weight: 600;
+  font-size: 13px;
+  color: #333;
+}
+
+.student-card-body {
+  padding: 12px 14px;
+}
+
+.student-card-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.student-card-row:last-child {
+  border-bottom: none;
+}
+
+.student-card-label {
+  font-weight: 600;
+  color: #666;
+  font-size: 12px;
+  flex: 0 0 auto;
+}
+
+.student-card-value {
+  text-align: right;
+  color: #333;
+  font-size: 12px;
+  font-weight: 500;
+  flex: 1;
+  margin-left: 10px;
+  word-break: break-word;
+}
+
+/* Desktop view - show table by default */
+.desktop-student-view {
+  display: block !important;
+}
+
+/* Mobile view - hide card by default */
+.mobile-student-view {
+  display: none;
+}
+
+/* Desktop - hide mobile attendance view */
+.mobile-attendance-view {
+  display: none;
+}
+
+/* Desktop - show attendance table */
+.desktop-attendance-view {
+  display: block;
+}
+
 .student-list-table th,
 .student-list-table td {
-  padding: 12px;
+  padding: 10px 8px;
   text-align: left;
   border-bottom: 1px solid #e0e0e0;
+  font-size: 13px;
 }
 
 .student-list-table th {
@@ -1784,18 +3417,18 @@ video {
 .badge-attended {
   background: #4caf50;
   color: white;
-  padding: 4px 12px;
-  border-radius: 12px;
-  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 10px;
+  font-size: 11px;
   font-weight: 600;
 }
 
 .badge-not-attended {
   background: #9e9e9e;
   color: white;
-  padding: 4px 12px;
-  border-radius: 12px;
-  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 10px;
+  font-size: 11px;
   font-weight: 600;
 }
 
@@ -1827,7 +3460,11 @@ video {
   cursor: pointer;
   transition: all 0.3s;
   font-weight: 500;
+  white-space: normal;
+  word-break: break-word;
 }
+.desktop-only { display: block; }
+.mobile-only { display: none; }
 
 .exam-dropdown:focus {
   outline: none;
@@ -1837,6 +3474,9 @@ video {
 
 .exam-dropdown option {
   padding: 10px;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.4;
 }
 
 .attendance-summary-box {
@@ -1849,7 +3489,8 @@ video {
 
 .summary-item {
   display: flex;
-  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
   padding: 10px 0;
   border-bottom: 1px solid rgba(0, 0, 0, 0.1);
 }
@@ -1861,13 +3502,13 @@ video {
 .summary-item .label {
   font-weight: 600;
   color: #555;
-  min-width: 120px;
+  flex-shrink: 0;
 }
 
 .summary-item .value {
   color: #333;
   font-weight: 500;
-  text-align: right;
+  flex: 1;
 }
 
 .summary-item.stats .value {
@@ -1877,19 +3518,35 @@ video {
   justify-content: flex-end;
 }
 
+.stats-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.stat-separator {
+  color: #999;
+  font-weight: 400;
+  margin: 0 4px;
+}
+
 .stat-attended {
   color: #4caf50;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .stat-not-attended {
   color: #ff9800;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .stat-total {
   color: #2196f3;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .filter-tabs {
@@ -1931,6 +3588,58 @@ video {
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Search styles */
+.attendance-search {
+  background: #ffffff;
+  padding: 12px 16px;
+  border-top: 1px solid #eef2f5;
+  border-bottom: 1px solid #eef2f5;
+}
+
+.attendance-search-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.attendance-search-input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+}
+
+/* Single student detail card */
+.student-detail-card {
+  margin: 16px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  background: #e8f5e9;
+  border: 1px solid #c8e6c9;
+}
+
+.student-detail-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.student-detail-row:last-child {
+  border-bottom: none;
+}
+
+.detail-label {
+  font-weight: 600;
+  color: #0c7de7;
+}
+
+.detail-value {
+  font-weight: 500;
+  color: #2c3e50;
 }
 
 .attendance-table {
